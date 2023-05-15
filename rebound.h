@@ -62,7 +62,7 @@ typedef char b8_t;
 #endif // NULL
 
 /*=========================*/
-// Allocator API
+// User defined API
 /*=========================*/
 
 typedef struct re_allocator_t re_allocator_t;
@@ -71,5 +71,23 @@ struct re_allocator_t {
     void *(*alloc)(re_allocator_t *allocator, usize_t size);
     void *(*free)(re_allocator_t *allocator, void *ptr);
 };
+
+/*=========================*/
+// Dynamic library loading
+/*=========================*/
+
+typedef struct re_lib_t re_lib_t;
+struct re_lib_t {
+#if defined(RE_OS_LINUX)
+    void *handle;
+#endif
+    b8_t valid;
+};
+
+typedef void (*re_func_ptr_t)(void);
+
+RE_API re_lib_t re_lib_load(const char *path);
+RE_API void re_lib_unload(re_lib_t *lib);
+RE_API re_func_ptr_t re_lib_func(re_lib_t lib, const char *name);
 
 #endif // REBOUND_H
