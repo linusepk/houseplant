@@ -4,3 +4,6 @@
 -pedantic
 
 -I.
+
+-DRE_VULKAN
+-DRE_DEBUG
