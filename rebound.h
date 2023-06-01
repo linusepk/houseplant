@@ -7,18 +7,13 @@
 // Includes
 /*=========================*/
 
-#include <string.h>
-
-#ifdef RE_VULKAN
-#include <vulkan/vulkan.h>
-#endif // RE_VULKAN
-
 //  ____                   _
 // | __ )  __ _ ___  ___  | |    __ _ _   _  ___ _ __
 // |  _ \ / _` / __|/ _ \ | |   / _` | | | |/ _ \ '__|
 // | |_) | (_| \__ \  __/ | |__| (_| | |_| |  __/ |
 // |____/ \__,_|___/\___| |_____\__,_|\__, |\___|_|
 //                                    |___/
+// Base layer
 
 /*=========================*/
 // Context cracking
@@ -26,6 +21,7 @@
 
 #ifdef _WIN32
 #define RE_OS_WINDOWS
+#error "Windows is currently not supported"
 #endif // _WIN32
 
 #ifdef __linux__
@@ -81,7 +77,7 @@ typedef char b8_t;
 #endif // NULL
 
 /*=========================*/
-// User defined API
+// Allocator interface
 /*=========================*/
 
 typedef void *(*re_allocactor_reserve_func_t)(usize_t size, void *ctx);
@@ -96,18 +92,20 @@ struct re_allocator_t {
     void *ctx;
 };
 
-RE_API void *re_libc_reserve(usize_t size, void *ctx);
-RE_API void re_libc_commit(void *ptr, usize_t size, void *ctx);
-RE_API void re_libc_decommit(void *ptr, usize_t size, void *ctx);
-RE_API void re_libc_release(void *ptr, usize_t size, void *ctx);
+RE_API void re_allocator_change_memory_dummy(void *ptr, usize_t size, void *ctx);
+
+#ifndef RE_NOLIBC
+RE_API void *_re_libc_reserve(usize_t size, void *ctx);
+RE_API void _re_libc_release(void *ptr, usize_t size, void *ctx);
 
 static const re_allocator_t re_libc_allocator = {
-    re_libc_reserve,
-    re_libc_commit,
-    re_libc_decommit,
-    re_libc_release,
+    _re_libc_reserve,
+    re_allocator_change_memory_dummy,
+    re_allocator_change_memory_dummy,
+    _re_libc_release,
     NULL
 };
+#endif // RE_NOLIBC
 
 /*=========================*/
 // Utils
@@ -118,6 +116,7 @@ static const re_allocator_t re_libc_allocator = {
 #define re_macro_var(NAME) re_concat(re_concat(UNIQUE_MACRO_ID, __LINE__), NAME)
 
 RE_API u32_t fvn1a_hash(const char *key, u32_t len);
+RE_API void re_memset(void *dest, u8_t value, usize_t size);
 
 /*=========================*/
 // Hash table
@@ -159,7 +158,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     usize_t re_macro_var(size) = re_macro_var(new_cap) * sizeof(__typeof__(*(HT)->entries));                                \
     __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(re_macro_var(size), (HT)->allocator.ctx); \
     (HT)->allocator.commit(re_macro_var(new_entries), re_macro_var(size), (HT)->allocator.ctx);                             \
-    memset(re_macro_var(new_entries), 0, re_macro_var(size));                                                               \
+    re_memset(re_macro_var(new_entries), 0, re_macro_var(size));                                                            \
     for (usize_t i = 0; i < (HT)->capacity; i++) {                                                                          \
         __typeof__(*(HT)->entries) re_macro_var(old) = (HT)->entries[i];                                                    \
         if (!re_macro_var(old).alive) {                                                                                     \
@@ -179,7 +178,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (ALLOC).commit((HT), sizeof(__typeof__(*(HT))), (ALLOC).ctx);                                      \
     (HT)->entries = (ALLOC).reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
     (ALLOC).commit((HT)->entries, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx);   \
-    memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)));                     \
+    re_memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)));                  \
     (HT)->count = 0;                                                                                   \
     (HT)->capacity = RE_HT_INIT_CAP;                                                                   \
     (HT)->allocator = (ALLOC);                                                                         \
@@ -230,7 +229,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 #define re_ht_clear(HT) do {                                                                                                                                 \
     __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
     (HT)->allocator.commit(re_macro_var(new_entries), RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx);                             \
-    memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)));                                                               \
+    re_memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)));                                                            \
     (HT)->allocator.release((HT)->entries, sizeof(__typeof__(*(HT)->entries)) * (HT)->capacity, (HT)->allocator.ctx);                                        \
     (HT)->entries = re_macro_var(new_entries);                                                                                                               \
     (HT)->capacity = RE_HT_INIT_CAP;                                                                                                                         \
@@ -243,44 +242,39 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 // |  __/| | (_| | |_|  _| (_) | |  | | | | | | | |__| (_| | |_| |  __/ |
 // |_|   |_|\__,_|\__|_|  \___/|_|  |_| |_| |_| |_____\__,_|\__, |\___|_|
 //                                                          |___/
+// Platform layer
 
 /*=========================*/
 // Dynamic library loading
 /*=========================*/
 
 typedef struct re_lib_t re_lib_t;
-struct re_lib_t {
-#ifdef RE_OS_LINUX
-    void *handle;
-#endif
-    b8_t valid;
-};
 
 typedef void (*re_func_ptr_t)(void);
 
-RE_API re_lib_t re_lib_load(const char *path);
+RE_API re_lib_t *re_lib_load(const char *path, re_allocator_t allocator);
 RE_API void re_lib_unload(re_lib_t *lib);
-RE_API re_func_ptr_t re_lib_func(re_lib_t lib, const char *name);
+RE_API re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name);
 
 /*=========================*/
 // Allocators
 /*=========================*/
 
-RE_API void *re_platform_reserve(usize_t size);
-RE_API void re_platform_commit(void *ptr, usize_t size);
-RE_API void re_platform_decommit(void *ptr, usize_t size);
-RE_API void re_platform_release(void *ptr, usize_t size);
+RE_API void *re_os_reserve(usize_t size);
+RE_API void re_os_commit(void *ptr, usize_t size);
+RE_API void re_os_decommit(void *ptr, usize_t size);
+RE_API void re_os_release(void *ptr, usize_t size);
 
-RE_API void *_re_platform_reserve(usize_t size, void *ctx);
-RE_API void _re_platform_commit(void *ptr, usize_t size, void *ctx);
-RE_API void _re_platform_decommit(void *ptr, usize_t size, void *ctx);
-RE_API void _re_platform_release(void *ptr, usize_t size, void *ctx);
+RE_API void *_re_os_reserve(usize_t size, void *ctx);
+RE_API void _re_os_commit(void *ptr, usize_t size, void *ctx);
+RE_API void _re_os_decommit(void *ptr, usize_t size, void *ctx);
+RE_API void _re_os_release(void *ptr, usize_t size, void *ctx);
 
-static const re_allocator_t re_platform_allocator = {
-    _re_platform_reserve,
-    _re_platform_commit,
-    _re_platform_decommit,
-    _re_platform_release,
+static const re_allocator_t re_os_allocator = {
+    _re_os_reserve,
+    _re_os_commit,
+    _re_os_decommit,
+    _re_os_release,
     NULL
 };
 
