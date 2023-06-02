@@ -44,7 +44,7 @@ void _re_libc_release(void *ptr, usize_t size, void *ctx) {
 // Utils
 /*=========================*/
 
-u32_t fvn1a_hash(const char *key, u32_t len) {
+usize_t re_fvn1a_hash(const char *key, usize_t len) {
     u32_t hash = 2166136261u;
     for (u32_t i = 0; i < len; i++) {
         hash ^= (u8_t) key[i];

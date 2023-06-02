@@ -115,7 +115,7 @@ static const re_allocator_t re_libc_allocator = {
 #define re_concat(A, B) _re_concat(A, B)
 #define re_macro_var(NAME) re_concat(re_concat(UNIQUE_MACRO_ID, __LINE__), NAME)
 
-RE_API u32_t fvn1a_hash(const char *key, u32_t len);
+RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 RE_API void re_memset(void *dest, u8_t value, usize_t size);
 
 /*=========================*/
@@ -193,11 +193,12 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 } while (0)
 
 #define re_ht_set(HT, KEY, VALUE) do {                                                        \
+    __typeof__(KEY) re_macro_var(temp_key) = KEY;                                             \
     if ((HT)->count + 1 > (HT)->capacity * RE_HT_MAX_FILL) {                                  \
         _re_ht_resize(HT);                                                                    \
     }                                                                                         \
     __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                   \
-    usize_t re_macro_var(hash) = (HT)->hash_func((KEY), (HT)->key_size);                      \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size);    \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
     if (!re_macro_var(entry)->alive) {                                                        \
         (HT)->count++;                                                                        \
@@ -208,8 +209,9 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 } while (0)
 
 #define re_ht_get(HT, KEY, OUT) do {                                                          \
+    __typeof__(KEY) re_macro_var(temp_key) = KEY;                                             \
     __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                   \
-    usize_t re_macro_var(hash) = (HT)->hash_func((KEY), (HT)->key_size);                      \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size);    \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
     if (re_macro_var(entry)->alive) {                                                         \
         (OUT) = re_macro_var(entry)->value;                                                   \
@@ -217,8 +219,9 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 } while (0)
 
 #define re_ht_remove(HT, KEY) do {                                                            \
+    __typeof__(KEY) re_macro_var(temp_key) = (KEY);                                           \
     __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                   \
-    usize_t re_macro_var(hash) = (HT)->hash_func((KEY), (HT)->key_size);                      \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size);    \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
     if (re_macro_var(entry)->alive) {                                                         \
         (HT)->count--;                                                                        \
