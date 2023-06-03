@@ -72,6 +72,7 @@ typedef char b8_t;
 #define false 0
 #endif // false
 
+typedef u8_t *ptr_t;
 #ifndef NULL
 #define NULL ((void *) 0)
 #endif // NULL
