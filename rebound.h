@@ -97,7 +97,7 @@ RE_API void re_allocator_change_memory_dummy(void *ptr, usize_t size, void *ctx)
 
 #ifndef RE_NOLIBC
 RE_API void *_re_libc_reserve(usize_t size, void *ctx);
-RE_API void _re_libc_release(void *ptr, usize_t size, void *ctx);
+RE_API void  _re_libc_release(void *ptr, usize_t size, void *ctx);
 
 static const re_allocator_t re_libc_allocator = {
     _re_libc_reserve,
@@ -117,7 +117,7 @@ static const re_allocator_t re_libc_allocator = {
 #define re_macro_var(NAME) re_concat(re_concat(UNIQUE_MACRO_ID, __LINE__), NAME)
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
-RE_API void re_memset(void *dest, u8_t value, usize_t size);
+RE_API void    re_memset(void *dest, u8_t value, usize_t size);
 
 /*=========================*/
 // Hash table
@@ -256,8 +256,8 @@ typedef struct re_lib_t re_lib_t;
 
 typedef void (*re_func_ptr_t)(void);
 
-RE_API re_lib_t *re_lib_load(const char *path, re_allocator_t allocator);
-RE_API void re_lib_unload(re_lib_t *lib);
+RE_API re_lib_t     *re_lib_load(const char *path, re_allocator_t allocator);
+RE_API void          re_lib_unload(re_lib_t *lib);
 RE_API re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name);
 
 /*=========================*/
@@ -265,14 +265,14 @@ RE_API re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name);
 /*=========================*/
 
 RE_API void *re_os_reserve(usize_t size);
-RE_API void re_os_commit(void *ptr, usize_t size);
-RE_API void re_os_decommit(void *ptr, usize_t size);
-RE_API void re_os_release(void *ptr, usize_t size);
+RE_API void  re_os_commit(void *ptr, usize_t size);
+RE_API void  re_os_decommit(void *ptr, usize_t size);
+RE_API void  re_os_release(void *ptr, usize_t size);
 
 RE_API void *_re_os_reserve(usize_t size, void *ctx);
-RE_API void _re_os_commit(void *ptr, usize_t size, void *ctx);
-RE_API void _re_os_decommit(void *ptr, usize_t size, void *ctx);
-RE_API void _re_os_release(void *ptr, usize_t size, void *ctx);
+RE_API void  _re_os_commit(void *ptr, usize_t size, void *ctx);
+RE_API void  _re_os_decommit(void *ptr, usize_t size, void *ctx);
+RE_API void  _re_os_release(void *ptr, usize_t size, void *ctx);
 
 static const re_allocator_t re_os_allocator = {
     _re_os_reserve,
@@ -281,5 +281,30 @@ static const re_allocator_t re_os_allocator = {
     _re_os_release,
     NULL
 };
+
+/*=========================*/
+// Multithreading
+/*=========================*/
+
+// Threads
+typedef struct re_thread_t re_thread_t;
+struct re_thread_t {
+    usize_t handle;
+};
+
+typedef void (*re_thread_func_t)(void *arg);
+
+RE_API void       *_re_thread_func(void *arg);
+RE_API re_thread_t re_thread_create(re_thread_func_t func, void *arg);
+RE_API void        re_thread_destroy(re_thread_t thread);
+RE_API void        re_thread_wait(re_thread_t thread);
+
+// Mutexes
+typedef struct re_mutex_t re_mutex_t;
+
+RE_API re_mutex_t *re_mutex_create(re_allocator_t alloc);
+RE_API void        re_mutex_destroy(re_mutex_t *mutex);
+RE_API void        re_mutex_lock(re_mutex_t *mutex);
+RE_API void        re_mutex_unlock(re_mutex_t *mutex);
 
 #endif // REBOUND_H

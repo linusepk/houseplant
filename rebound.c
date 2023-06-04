@@ -3,6 +3,7 @@
 #ifdef RE_OS_LINUX
 #include <dlfcn.h>
 #include <sys/mman.h>
+#include <pthread.h>
 #endif
 
 #ifndef RE_NOLIBC
@@ -69,10 +70,20 @@ void re_memset(void *dest, u8_t value, usize_t size) {
 // Platform layer
 
 #ifdef RE_OS_LINUX
+
+/*=========================*/
+// Platform specific structs
+/*=========================*/
+
 struct re_lib_t {
     void *handle;
     re_allocator_t alloc;
     b8_t valid;
+};
+
+struct re_mutex_t {
+    re_allocator_t alloc;
+    pthread_mutex_t handle;
 };
 
 /*=========================*/
@@ -135,6 +146,44 @@ void re_os_decommit(void *ptr, usize_t size) {
 void re_os_release(void *ptr, usize_t size) {
     munmap(ptr, size);
 }
+
+/*=========================*/
+// Multithreading
+/*=========================*/
+
+// Threads
+re_thread_t re_thread_create(re_thread_func_t func, void *arg) {
+    re_thread_t thread = {0};
+	typedef void *(*_re_pthread_func_t) (void *);
+    pthread_create(&thread.handle, NULL, *(_re_pthread_func_t *) &func, arg);
+    return thread;
+}
+
+void re_thread_destroy(re_thread_t thread) {
+    (void) thread;
+}
+
+void re_thread_wait(re_thread_t thread) {
+    pthread_join(thread.handle, NULL);
+}
+
+// Mutexes
+re_mutex_t *re_mutex_create(re_allocator_t alloc) {
+    re_mutex_t *mutex = alloc.reserve(sizeof(re_mutex_t), alloc.ctx);
+    alloc.commit(mutex, sizeof(re_mutex_t), alloc.ctx);
+    mutex->alloc = alloc;
+    mutex->handle = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
+    return mutex;
+}
+
+void re_mutex_destroy(re_mutex_t *mutex) {
+    pthread_mutex_destroy(&mutex->handle);
+    mutex->alloc.release(mutex, sizeof(re_mutex_t), mutex->alloc.ctx);
+}
+
+void re_mutex_lock(re_mutex_t *mutex)   { pthread_mutex_lock(&mutex->handle); }
+void re_mutex_unlock(re_mutex_t *mutex) { pthread_mutex_unlock(&mutex->handle); }
+
 #endif // RE_OS_LINUX
 
 void *_re_os_reserve(usize_t size, void *ctx) {
