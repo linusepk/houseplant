@@ -61,6 +61,55 @@ void re_memset(void *dest, u8_t value, usize_t size) {
     }
 }
 
+/*=========================*/
+// Strings
+/*=========================*/
+
+re_str_t re_str(const char *cstr, usize_t len) {
+    return (re_str_t) { len, cstr };
+}
+
+re_str_t re_str_sub(re_str_t string, usize_t start, usize_t end) {
+    usize_t len = end - start + 1;
+    len = re_clamp_max(len, string.len);
+    return (re_str_t) {
+        len,
+        &string.str[start]
+    };
+}
+
+re_str_t re_str_prefix(re_str_t string, usize_t len) {
+    usize_t clamped_len = re_clamp_max(len, string.len);
+    return (re_str_t) {
+        clamped_len,
+        string.str
+    };
+}
+
+re_str_t re_str_suffix(re_str_t string, usize_t len) {
+    usize_t clamped_len = re_clamp_max(len, string.len);
+    return (re_str_t) {
+        clamped_len,
+        &string.str[string.len - clamped_len]
+    };
+}
+
+re_str_t re_str_chop(re_str_t string, usize_t len) {
+    usize_t clamped_len = re_clamp_max(len, string.len);
+    return (re_str_t) {
+        string.len - clamped_len,
+        string.str
+    };
+}
+
+re_str_t re_str_skip(re_str_t string, usize_t len) {
+    usize_t clamped_len = re_clamp_max(string.len - len, string.len);
+    return (re_str_t) {
+        clamped_len,
+        string.str + len
+    };
+}
+
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
 // | |_) | |/ _` | __| |_ / _ \| '__| '_ ` _ \  | |   / _` | | | |/ _ \ '__|

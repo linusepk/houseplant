@@ -108,6 +108,8 @@ static const re_allocator_t re_libc_allocator = {
 };
 #endif // RE_NOLIBC
 
+#define re_allocator_null { NULL, NULL, NULL, NULL, NULL }
+
 /*=========================*/
 // Utils
 /*=========================*/
@@ -115,6 +117,10 @@ static const re_allocator_t re_libc_allocator = {
 #define _re_concat(A, B) A##B
 #define re_concat(A, B) _re_concat(A, B)
 #define re_macro_var(NAME) re_concat(re_concat(UNIQUE_MACRO_ID, __LINE__), NAME)
+
+#define re_clamp(V, MIN, MAX) (V) > (MAX) ? (MAX) : (V) < (MIN) ? (MIN) : (V)
+#define re_clamp_max(V, MAX) (V) > (MAX) ? (MAX) : (V)
+#define re_clamp_min(V, MIN) (V) < (MIN) ? (MIN) : (V)
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 RE_API void    re_memset(void *dest, u8_t value, usize_t size);
@@ -239,6 +245,24 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (HT)->capacity = RE_HT_INIT_CAP;                                                                                                                         \
     (HT)->count = 0;                                                                                                                                         \
 } while (0)
+
+/*=========================*/
+// Strings
+/*=========================*/
+
+typedef struct re_str_t re_str_t;
+struct re_str_t {
+    usize_t len;
+    const char *str;
+};
+
+#define re_str_lit(str) re_str(str, sizeof(str) - 1)
+RE_API re_str_t re_str(const char *cstr, usize_t len);
+RE_API re_str_t re_str_sub(re_str_t string, usize_t start, usize_t end);
+RE_API re_str_t re_str_prefix(re_str_t string, usize_t len);
+RE_API re_str_t re_str_suffix(re_str_t string, usize_t len);
+RE_API re_str_t re_str_chop(re_str_t string, usize_t len);
+RE_API re_str_t re_str_skip(re_str_t string, usize_t len);
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
