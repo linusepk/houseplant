@@ -136,114 +136,114 @@ RE_API void    re_memset(void *dest, u8_t value, usize_t size);
 typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 
 #define re_ht_t(K, V) struct { \
-    struct {                   \
-        usize_t hash;          \
-        V value;               \
-        b8_t alive;            \
-    } *entries;                \
-    usize_t count;             \
-    usize_t capacity;          \
-    re_allocator_t allocator;  \
-    usize_t key_size;          \
-    K temp_key;                \
-    re_hash_func_t hash_func;  \
+    struct { \
+        usize_t hash; \
+        V value; \
+        b8_t alive; \
+    } *entries; \
+    usize_t count; \
+    usize_t capacity; \
+    re_allocator_t allocator; \
+    usize_t key_size; \
+    K temp_key; \
+    re_hash_func_t hash_func; \
 } *
 
-#define _re_ht_get_entry(ENTRIES, CAP, HASH, OUT_ENTRY) do {                                          \
-    usize_t re_macro_var(index) = (HASH) % (CAP);                                                     \
-    for (;;) {                                                                                        \
+#define _re_ht_get_entry(ENTRIES, CAP, HASH, OUT_ENTRY) do { \
+    usize_t re_macro_var(index) = (HASH) % (CAP); \
+    for (;;) { \
         if (!(ENTRIES)[re_macro_var(index)].alive || (ENTRIES)[re_macro_var(index)].hash == (HASH)) { \
-            (OUT_ENTRY) = &(ENTRIES)[re_macro_var(index)];                                            \
-            break;                                                                                    \
-        }                                                                                             \
-        re_macro_var(index)= (re_macro_var(index) + 1) % (CAP);                                       \
-    }                                                                                                 \
+            (OUT_ENTRY) = &(ENTRIES)[re_macro_var(index)]; \
+            break; \
+        } \
+        re_macro_var(index)= (re_macro_var(index) + 1) % (CAP); \
+    } \
 } while (0)
 
-#define _re_ht_resize(HT) do {                                                                                              \
-    usize_t re_macro_var(new_cap) = (HT)->capacity * RE_HT_GROW_RATE;                                                       \
-    usize_t re_macro_var(size) = re_macro_var(new_cap) * sizeof(__typeof__(*(HT)->entries));                                \
+#define _re_ht_resize(HT) do { \
+    usize_t re_macro_var(new_cap) = (HT)->capacity * RE_HT_GROW_RATE; \
+    usize_t re_macro_var(size) = re_macro_var(new_cap) * sizeof(__typeof__(*(HT)->entries)); \
     __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(re_macro_var(size), (HT)->allocator.ctx); \
-    (HT)->allocator.commit(re_macro_var(new_entries), re_macro_var(size), (HT)->allocator.ctx);                             \
-    re_memset(re_macro_var(new_entries), 0, re_macro_var(size));                                                            \
-    for (usize_t i = 0; i < (HT)->capacity; i++) {                                                                          \
-        __typeof__(*(HT)->entries) re_macro_var(old) = (HT)->entries[i];                                                    \
-        if (!re_macro_var(old).alive) {                                                                                     \
-            continue;                                                                                                       \
-        }                                                                                                                   \
-        __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                                             \
-        _re_ht_get_entry(re_macro_var(new_entries), re_macro_var(new_cap), re_macro_var(old).hash, re_macro_var(entry));    \
-        *re_macro_var(entry) = re_macro_var(old);                                                                           \
-    }                                                                                                                       \
-    (HT)->allocator.release((HT)->entries, (HT)->capacity * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx);       \
-    (HT)->entries = re_macro_var(new_entries);                                                                              \
-    (HT)->capacity = re_macro_var(new_cap);                                                                                 \
+    (HT)->allocator.commit(re_macro_var(new_entries), re_macro_var(size), (HT)->allocator.ctx); \
+    re_memset(re_macro_var(new_entries), 0, re_macro_var(size)); \
+    for (usize_t i = 0; \
+        __typeof__(*(HT)->entries) re_macro_var(old) = (HT)->entries[i]; \
+        if (!re_macro_var(old).alive) { \
+            continue; \
+        } \
+        __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
+        _re_ht_get_entry(re_macro_var(new_entries), re_macro_var(new_cap), re_macro_var(old).hash, re_macro_var(entry)); \
+        *re_macro_var(entry) = re_macro_var(old); \
+    } \
+    (HT)->allocator.release((HT)->entries, (HT)->capacity * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
+    (HT)->entries = re_macro_var(new_entries); \
+    (HT)->capacity = re_macro_var(new_cap); \
 } while (0)
 
-#define re_ht_create(HT, ALLOC, HASH_FUNC) do {                                                        \
-    (HT) = (ALLOC).reserve(sizeof(__typeof__(*(HT))), (ALLOC).ctx);                                    \
-    (ALLOC).commit((HT), sizeof(__typeof__(*(HT))), (ALLOC).ctx);                                      \
+#define re_ht_create(HT, ALLOC, HASH_FUNC) do { \
+    (HT) = (ALLOC).reserve(sizeof(__typeof__(*(HT))), (ALLOC).ctx); \
+    (ALLOC).commit((HT), sizeof(__typeof__(*(HT))), (ALLOC).ctx); \
     (HT)->entries = (ALLOC).reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
-    (ALLOC).commit((HT)->entries, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx);   \
-    re_memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)));                  \
-    (HT)->count = 0;                                                                                   \
-    (HT)->capacity = RE_HT_INIT_CAP;                                                                   \
-    (HT)->allocator = (ALLOC);                                                                         \
-    (HT)->key_size = sizeof((HT)->temp_key);                                                           \
-    (HT)->hash_func = (HASH_FUNC);                                                                     \
+    (ALLOC).commit((HT)->entries, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
+    re_memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
+    (HT)->count = 0; \
+    (HT)->capacity = RE_HT_INIT_CAP; \
+    (HT)->allocator = (ALLOC); \
+    (HT)->key_size = sizeof((HT)->temp_key); \
+    (HT)->hash_func = (HASH_FUNC); \
 } while (0)
 
-#define re_ht_destroy(HT) do {                                                                                        \
+#define re_ht_destroy(HT) do { \
     (HT)->allocator.release((HT)->entries, sizeof(__typeof__(*(HT)->entries)) * (HT)->capacity, (HT)->allocator.ctx); \
-    (HT)->allocator.release((HT), sizeof(*(HT)), (HT)->allocator.ctx);                                                \
-    (HT) = NULL;                                                                                                      \
+    (HT)->allocator.release((HT), sizeof(*(HT)), (HT)->allocator.ctx); \
+    (HT) = NULL; \
 } while (0)
 
-#define re_ht_set(HT, KEY, VALUE) do {                                                        \
-    __typeof__(KEY) re_macro_var(temp_key) = KEY;                                             \
-    if ((HT)->count + 1 > (HT)->capacity * RE_HT_MAX_FILL) {                                  \
-        _re_ht_resize(HT);                                                                    \
-    }                                                                                         \
-    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                   \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size);    \
+#define re_ht_set(HT, KEY, VALUE) do { \
+    __typeof__(KEY) re_macro_var(temp_key) = KEY; \
+    if ((HT)->count + 1 > (HT)->capacity * RE_HT_MAX_FILL) { \
+        _re_ht_resize(HT); \
+    } \
+    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size); \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
-    if (!re_macro_var(entry)->alive) {                                                        \
-        (HT)->count++;                                                                        \
-    }                                                                                         \
-    re_macro_var(entry)->hash = re_macro_var(hash);                                           \
-    re_macro_var(entry)->value = (VALUE);                                                     \
-    re_macro_var(entry)->alive = true;                                                        \
+    if (!re_macro_var(entry)->alive) { \
+        (HT)->count++; \
+    } \
+    re_macro_var(entry)->hash = re_macro_var(hash); \
+    re_macro_var(entry)->value = (VALUE); \
+    re_macro_var(entry)->alive = true; \
 } while (0)
 
-#define re_ht_get(HT, KEY, OUT) do {                                                          \
-    __typeof__(KEY) re_macro_var(temp_key) = KEY;                                             \
-    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                   \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size);    \
-    _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
-    if (re_macro_var(entry)->alive) {                                                         \
-        (OUT) = re_macro_var(entry)->value;                                                   \
-    }                                                                                         \
-} while (0)
-
-#define re_ht_remove(HT, KEY) do {                                                            \
-    __typeof__(KEY) re_macro_var(temp_key) = (KEY);                                           \
-    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL;                                   \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size);    \
+#define re_ht_get(HT, KEY, OUT) do { \
+    __typeof__(KEY) re_macro_var(temp_key) = KEY; \
+    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size); \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
     if (re_macro_var(entry)->alive) {                                                         \
-        (HT)->count--;                                                                        \
-    }                                                                                         \
-    re_macro_var(entry)->alive = false;                                                       \
+        (OUT) = re_macro_var(entry)->value; \
+    } \
 } while (0)
 
-#define re_ht_clear(HT) do {                                                                                                                                 \
+#define re_ht_remove(HT, KEY) do { \
+    __typeof__(KEY) re_macro_var(temp_key) = (KEY); \
+    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size); \
+    _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
+    if (re_macro_var(entry)->alive) { \
+        (HT)->count--; \
+    } \
+    re_macro_var(entry)->alive = false; \
+} while (0)
+
+#define re_ht_clear(HT) do { \
     __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
-    (HT)->allocator.commit(re_macro_var(new_entries), RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx);                             \
-    re_memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)));                                                            \
-    (HT)->allocator.release((HT)->entries, sizeof(__typeof__(*(HT)->entries)) * (HT)->capacity, (HT)->allocator.ctx);                                        \
-    (HT)->entries = re_macro_var(new_entries);                                                                                                               \
-    (HT)->capacity = RE_HT_INIT_CAP;                                                                                                                         \
-    (HT)->count = 0;                                                                                                                                         \
+    (HT)->allocator.commit(re_macro_var(new_entries), RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
+    re_memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
+    (HT)->allocator.release((HT)->entries, sizeof(__typeof__(*(HT)->entries)) * (HT)->capacity, (HT)->allocator.ctx); \
+    (HT)->entries = re_macro_var(new_entries); \
+    (HT)->capacity = RE_HT_INIT_CAP; \
+    (HT)->count = 0; \
 } while (0)
 
 /*=========================*/
@@ -263,6 +263,76 @@ RE_API re_str_t re_str_prefix(re_str_t string, usize_t len);
 RE_API re_str_t re_str_suffix(re_str_t string, usize_t len);
 RE_API re_str_t re_str_chop(re_str_t string, usize_t len);
 RE_API re_str_t re_str_skip(re_str_t string, usize_t len);
+
+/*=========================*/
+// Linked lists
+/*=========================*/
+
+// Singly linked list stack (slls)
+#define re_slls_push_n(STACK, NODE, NEXT) ( \
+    (NODE)->NEXT = NULL, \
+    (STACK) == NULL ? \
+        ((STACK) = NODE) : \
+        ((NODE)->NEXT = (STACK), (STACK) = (NODE)) \
+)
+#define re_slls_pop_n(STACK, NODE) ( \
+    (STACK) != NULL ? \
+        (STACK) = (STACK)->NODE : \
+        0 \
+)
+#define re_slls_push(STACK, NODE) re_slls_push_n(STACK, NODE, next)
+#define re_slls_pop(STACK) re_slls_pop_n(STACK, next)
+
+// Singly linked list queue (sllq)
+#define re_sllq_push_front_n(FIRST, LAST, NODE, NEXT) ( \
+    (FIRST) == NULL ? \
+        ((FIRST) = (LAST) = (NODE), (NODE)->NEXT = NULL) : \
+        ((NODE)->NEXT = (FIRST), (FIRST) = (NODE)) \
+)
+#define re_sllq_push_back_n(FIRST, LAST, NODE, NEXT) ( \
+    (NODE)->NEXT = NULL, \
+    (FIRST) == NULL ? \
+        (FIRST) = (LAST) = (NODE) : \
+        ((LAST)->NEXT = (NODE), (LAST) = (NODE)) \
+)
+#define re_sllq_pop_n(FIRST, LAST, NEXT) ( \
+    (FIRST) == (LAST) ? \
+        (FIRST) = (LAST) = NULL : \
+        ((FIRST) = (FIRST)->NEXT) \
+)
+#define re_sllq_push_front(FIRST, LAST, NODE) \
+    re_sllq_push_front_n(FIRST, LAST, NODE, next)
+#define re_sllq_push_back(FIRST, LAST, NODE) \
+    re_sllq_push_back_n(FIRST, LAST, NODE, next)
+#define re_sllq_pop(FIRST, LAST) \
+    re_sllq_pop_n(FIRST, LAST, next)
+
+// Doubly linked list (dll)
+#define re_dll_push_back_np(FIRST, LAST, NODE, NEXT, PREV) ( \
+    (NODE)->NEXT = NULL, \
+    (FIRST) == NULL ? \
+        ((FIRST) = (LAST) = (NODE), (NODE)->PREV = NULL) : \
+        ((LAST)->NEXT = (NODE), ((NODE)->PREV = (LAST), (LAST) = (NODE))) \
+)
+#define re_dll_push_front_np(FIRST, LAST, NODE, NEXT, PREV) ( \
+    (NODE)->PREV = NULL, \
+    (FIRST) == NULL ? \
+        ((FIRST) = (LAST) = (NODE), (NODE)->NEXT = NULL) : \
+        ((FIRST)->PREV = (NODE), ((NODE)->NEXT = (FIRST), (FIRST) = (NODE))) \
+)
+#define re_dll_remove_np(FIRST, LAST, NODE, NEXT, PREV) ( \
+    (NODE) == (FIRST) ? \
+        ((FIRST) = (FIRST)->NEXT, (FIRST)->PREV = NULL) : \
+        ((NODE) == (LAST) ? \
+            ((LAST) = (LAST)->PREV, (LAST)->NEXT = NULL) : \
+            ((NODE)->PREV->NEXT = (NODE)->NEXT, (NODE)->NEXT->PREV = (NODE)->PREV)) \
+)
+#define re_dll_push_back(FIRST, LAST, NODE) \
+    re_dll_push_back_np(FIRST, LAST, NODE, next, prev)
+#define re_dll_push_front(FIRST, LAST, NODE) \
+    re_dll_push_front_np(FIRST, LAST, NODE, next, prev)
+#define re_dll_remove(FIRST, LAST, NODE) \
+    re_dll_remove_np(FIRST, LAST, NODE, next, prev)
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
