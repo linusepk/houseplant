@@ -58,7 +58,10 @@ void *re_calloc(usize_t n, usize_t size, re_allocator_t allocator) {
 }
 
 void *re_realloc(void *ptr, usize_t size, re_allocator_t allocator) {
-    usize_t old_size = *(usize_t *) ((ptr_t) ptr - sizeof(usize_t));
+    usize_t old_size = re_malloc_size(ptr);
+    if (old_size >= size) {
+        return ptr;
+    }
     void *new_ptr = re_malloc(size, allocator);
     if (!new_ptr) {
         return NULL;
@@ -69,8 +72,12 @@ void *re_realloc(void *ptr, usize_t size, re_allocator_t allocator) {
 }
 
 void re_free(void *ptr, re_allocator_t allocator) {
-    usize_t *real_ptr = (usize_t *) ((ptr_t) ptr - sizeof(usize_t));
-    allocator.release(real_ptr, *real_ptr + sizeof(usize_t), allocator.ctx);
+    usize_t size = re_malloc_size(ptr);
+    allocator.release((ptr_t) ptr - sizeof(usize_t), size, allocator.ctx);
+}
+
+usize_t re_malloc_size(void *ptr) {
+    return *(usize_t *) ((ptr_t) ptr - sizeof(usize_t));
 }
 
 /*=========================*/
