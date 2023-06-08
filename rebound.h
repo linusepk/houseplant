@@ -110,6 +110,11 @@ static const re_allocator_t re_libc_allocator = {
 
 #define re_allocator_null { NULL, NULL, NULL, NULL, NULL }
 
+RE_API void *re_malloc(usize_t size, re_allocator_t allocator);
+RE_API void *re_calloc(usize_t n, usize_t size, re_allocator_t allocator);
+RE_API void *re_realloc(void *ptr, usize_t size, re_allocator_t allocator);
+RE_API void  re_free(void *ptr, re_allocator_t allocator);
+
 /*=========================*/
 // Utils
 /*=========================*/

@@ -37,6 +37,42 @@ void _re_libc_release(void *ptr, usize_t size, void *ctx) {
     free(ptr);
 }
 
+void *re_malloc(usize_t size, re_allocator_t allocator) {
+    usize_t new_size = size + sizeof(usize_t);
+    usize_t *ptr = allocator.reserve(new_size, allocator.ctx);
+    if (!ptr) {
+        return NULL;
+    }
+    allocator.commit(ptr, new_size, allocator.ctx);
+    *ptr = size;
+    return (ptr_t) ptr + sizeof(usize_t);
+}
+
+void *re_calloc(usize_t n, usize_t size, re_allocator_t allocator) {
+    void *ptr = re_malloc(size * n, allocator);
+    if (!ptr) {
+        return NULL;
+    }
+    memset(ptr, 0, size * n);
+    return ptr;
+}
+
+void *re_realloc(void *ptr, usize_t size, re_allocator_t allocator) {
+    usize_t old_size = *(usize_t *) ((ptr_t) ptr - sizeof(usize_t));
+    void *new_ptr = re_malloc(size, allocator);
+    if (!new_ptr) {
+        return NULL;
+    }
+    memcpy(new_ptr, ptr, old_size);
+    re_free(ptr, allocator);
+    return new_ptr;
+}
+
+void re_free(void *ptr, re_allocator_t allocator) {
+    usize_t *real_ptr = (usize_t *) ((ptr_t) ptr - sizeof(usize_t));
+    allocator.release(real_ptr, *real_ptr + sizeof(usize_t), allocator.ctx);
+}
+
 /*=========================*/
 // Utils
 /*=========================*/
