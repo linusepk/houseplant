@@ -7,6 +7,8 @@
 // Includes
 /*=========================*/
 
+#include <string.h> // memset
+
 //  ____                   _
 // | __ )  __ _ ___  ___  | |    __ _ _   _  ___ _ __
 // |  _ \ / _` / __|/ _ \ | |   / _` | | | |/ _ \ '__|
@@ -95,7 +97,6 @@ struct re_allocator_t {
 
 RE_API void re_allocator_change_memory_dummy(void *ptr, usize_t size, void *ctx);
 
-#ifndef RE_NOLIBC
 RE_API void *_re_libc_reserve(usize_t size, void *ctx);
 RE_API void  _re_libc_release(void *ptr, usize_t size, void *ctx);
 
@@ -106,7 +107,6 @@ static const re_allocator_t re_libc_allocator = {
     _re_libc_release,
     NULL
 };
-#endif // RE_NOLIBC
 
 #define re_allocator_null { NULL, NULL, NULL, NULL, NULL }
 
@@ -121,9 +121,14 @@ static const re_allocator_t re_libc_allocator = {
 #define re_clamp(V, MIN, MAX) (V) > (MAX) ? (MAX) : (V) < (MIN) ? (MIN) : (V)
 #define re_clamp_max(V, MAX) (V) > (MAX) ? (MAX) : (V)
 #define re_clamp_min(V, MIN) (V) < (MIN) ? (MIN) : (V)
+#define re_max(A, B) (A) > (B) ? (A) : (B)
+#define re_min(A, B) (A) < (B) ? (A) : (B)
+
+#define re_ptr_to_usize(PTR) ((usize_t) ((u8_t *) (PTR) - (u8_t) 0))
+#define re_usize_to_ptr(N) ((void *) ((u8_t *) + N))
+#define re_offsetof(S, M) re_ptr_to_usize(&((S *) 0)->M)
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
-RE_API void    re_memset(void *dest, u8_t value, usize_t size);
 
 /*=========================*/
 // Hash table
@@ -135,9 +140,11 @@ RE_API void    re_memset(void *dest, u8_t value, usize_t size);
 
 typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 
+typedef void *re_ht_t;
 #define re_ht_t(K, V) struct { \
     struct { \
         usize_t hash; \
+        K key; \
         V value; \
         b8_t alive; \
     } *entries; \
@@ -165,8 +172,8 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     usize_t re_macro_var(size) = re_macro_var(new_cap) * sizeof(__typeof__(*(HT)->entries)); \
     __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(re_macro_var(size), (HT)->allocator.ctx); \
     (HT)->allocator.commit(re_macro_var(new_entries), re_macro_var(size), (HT)->allocator.ctx); \
-    re_memset(re_macro_var(new_entries), 0, re_macro_var(size)); \
-    for (usize_t i = 0; \
+    memset(re_macro_var(new_entries), 0, re_macro_var(size)); \
+    for (usize_t i = 0; i < (HT)->capacity; i++) { \
         __typeof__(*(HT)->entries) re_macro_var(old) = (HT)->entries[i]; \
         if (!re_macro_var(old).alive) { \
             continue; \
@@ -185,7 +192,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (ALLOC).commit((HT), sizeof(__typeof__(*(HT))), (ALLOC).ctx); \
     (HT)->entries = (ALLOC).reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
     (ALLOC).commit((HT)->entries, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
-    re_memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
+    memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
     (HT)->count = 0; \
     (HT)->capacity = RE_HT_INIT_CAP; \
     (HT)->allocator = (ALLOC); \
@@ -211,6 +218,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
         (HT)->count++; \
     } \
     re_macro_var(entry)->hash = re_macro_var(hash); \
+    re_macro_var(entry)->key = re_macro_var(temp_key); \
     re_macro_var(entry)->value = (VALUE); \
     re_macro_var(entry)->alive = true; \
 } while (0)
@@ -246,6 +254,29 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (HT)->count = 0; \
 } while (0)
 
+#define re_ht_count(HT) (HT)->count
+
+typedef usize_t re_ht_iter_t;
+
+RE_API re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries, usize_t entry_count, usize_t alive_offset, usize_t stride);
+#define _re_ht_iter_next(HT, START) \
+    __re_ht_iter_next( \
+        (START), \
+        (HT)->entries, \
+        (HT)->capacity, \
+        re_offsetof(__typeof__(*(HT)->entries), alive), \
+        sizeof(__typeof__(*(HT)->entries)) \
+    )
+
+#define re_ht_iter_new(HT) _re_ht_iter_next((HT), 0)
+#define re_ht_iter_valid(HT, ITER) (ITER) < (HT)->capacity
+#define re_ht_iter_advance(HT, ITER) (ITER) = _re_ht_iter_next((HT), (ITER) + 1)
+
+#define re_ht_get_iter(HT, ITER, KEY, VALUE) do { \
+    (KEY) = (HT)->entries[(ITER)].key; \
+    (VALUE) = (HT)->entries[(ITER)].value; \
+} while (0)
+
 /*=========================*/
 // Strings
 /*=========================*/
@@ -256,6 +287,7 @@ struct re_str_t {
     const char *str;
 };
 
+#define re_str_null { 0, NULL }
 #define re_str_lit(str) re_str(str, sizeof(str) - 1)
 RE_API re_str_t re_str(const char *cstr, usize_t len);
 RE_API re_str_t re_str_sub(re_str_t string, usize_t start, usize_t end);
@@ -263,6 +295,7 @@ RE_API re_str_t re_str_prefix(re_str_t string, usize_t len);
 RE_API re_str_t re_str_suffix(re_str_t string, usize_t len);
 RE_API re_str_t re_str_chop(re_str_t string, usize_t len);
 RE_API re_str_t re_str_skip(re_str_t string, usize_t len);
+RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
 
 /*=========================*/
 // Linked lists

@@ -6,9 +6,7 @@
 #include <pthread.h>
 #endif
 
-#ifndef RE_NOLIBC
 #include <stdlib.h>
-#endif // RE_NOLIBC
 
 //  ____                   _
 // | __ )  __ _ ___  ___  | |    __ _ _   _  ___ _ __
@@ -28,7 +26,6 @@ void re_allocator_change_memory_dummy(void *ptr, usize_t size, void *ctx) {
     (void) ctx;
 }
 
-#ifndef RE_NOLIBC
 void *_re_libc_reserve(usize_t size, void *ctx) {
     (void) ctx;
     return malloc(size);
@@ -39,7 +36,6 @@ void _re_libc_release(void *ptr, usize_t size, void *ctx) {
     (void) ctx;
     free(ptr);
 }
-#endif // RE_NOLIBC
 
 /*=========================*/
 // Utils
@@ -54,11 +50,21 @@ usize_t re_fvn1a_hash(const char *key, usize_t len) {
     return hash;
 }
 
-void re_memset(void *dest, u8_t value, usize_t size) {
-    u8_t *_dest = dest;
-    while (size-- > 0) {
-        _dest[size] = value;
+/*=========================*/
+// Hash table
+/*=========================*/
+
+re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries, usize_t entry_count, usize_t alive_offset, usize_t stride) {
+    for (usize_t i = start; i < entry_count; i++) {
+        u8_t *entry = (u8_t *) entries + i * stride;
+        b8_t alive = *(entry + alive_offset);
+
+        if (alive) {
+            return i;
+        }
     }
+
+    return entry_count;
 }
 
 /*=========================*/
@@ -108,6 +114,26 @@ re_str_t re_str_skip(re_str_t string, usize_t len) {
         clamped_len,
         string.str + len
     };
+}
+
+i32_t re_str_cmp(re_str_t a, re_str_t b) {
+    if (a.str == b.str) {
+        return 0;
+    } else if (a.str == NULL) {
+        return -1;
+    } else if (b.str == NULL) {
+        return 1;
+    } else if (a.len != b.len) {
+        return a.str[0] > b.str[0] ? 1 : -1;
+    }
+
+    for (usize_t i = 0; i < a.len; i++) {
+        if (a.str[i] != b.str[i]) {
+            return a.str[i] > b.str[i] ? 1 : -1;
+        }
+    }
+
+    return 0;
 }
 
 //  ____  _       _    __                        _
