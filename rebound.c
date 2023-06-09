@@ -179,6 +179,115 @@ i32_t re_str_cmp(re_str_t a, re_str_t b) {
     return 0;
 }
 
+/*=========================*/
+// Dynamic array
+/*=========================*/
+
+void _re_da_resize(void **da, usize_t count) {
+    _re_da_header_t *head = _re_da_to_head(*da);
+    b8_t resize_needed = false;
+    if (head->count + count > head->cap) {
+        head->cap *= 2;
+        resize_needed = true;
+    }
+
+    if (!resize_needed) {
+        return;
+    }
+
+    void *new_head = re_realloc(head, sizeof(_re_da_header_t) + head->size * head->cap, head->alloc);
+    if (!new_head) {
+        *da = NULL;
+        return;
+    }
+    *da = _re_head_to_da(new_head);
+}
+
+void _re_da_create(void **da, usize_t size, re_allocator_t allocator) {
+    usize_t total_size = sizeof(_re_da_header_t) + size * _RE_DA_INIT_CAP;
+    _re_da_header_t *head = re_malloc(total_size, allocator);
+    if (!head) {
+        *da = NULL;
+        return;
+    }
+    head->alloc = allocator;
+    head->size = size;
+    head->count = 0;
+    head->cap = _RE_DA_INIT_CAP;
+
+    *da = _re_head_to_da(head);
+}
+
+void _re_da_destroy(void **da) {
+    _re_da_header_t *head = _re_da_to_head(*da);
+    re_free(head, head->alloc);
+    *da = NULL;
+}
+
+void _re_da_insert_fast(void **da, const void *value, usize_t index) {
+    _re_da_resize(da, 1);
+
+    _re_da_header_t *head = _re_da_to_head(*da);
+    index = re_clamp_max(index, head->count);
+
+    ptr_t dest = (ptr_t) *da + head->count * head->size;
+    ptr_t source = (ptr_t) *da + index * head->size;
+
+    memmove(dest, source, head->size);
+    memcpy(source, value, head->size);
+
+    head->count++;
+}
+
+void _re_da_remove_fast(void **da, usize_t index, void *output) {
+    _re_da_header_t *head = _re_da_to_head(*da);
+    index = re_clamp_max(index, head->count - 1);
+
+    ptr_t dest = (ptr_t) *da + index * head->size;
+    ptr_t source = (ptr_t) *da + (head->count - 1) * head->size;
+
+    if (output != NULL) {
+        memcpy(dest, output, head->size);
+    }
+    memmove(dest, source, head->size);
+
+    head->count--;
+}
+
+void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index) {
+    _re_da_resize(da, count);
+
+    _re_da_header_t *head = _re_da_to_head(*da);
+    index = re_clamp_max(index, head->count);
+
+    ptr_t dest = (ptr_t) *da + (index + count) * head->size;
+    ptr_t source = (ptr_t) *da + index * head->size;
+
+    memmove(dest, source, (head->count - index) * head->size);
+    if (arr == NULL) {
+        memset(source, 0, count * head->size);
+    } else {
+        memcpy(source, arr, count * head->size);
+    }
+
+    head->count += count;
+}
+
+void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output) {
+    _re_da_header_t *head = _re_da_to_head(*da);
+    index = re_clamp_max(index, head->count - count);
+
+    ptr_t dest = (ptr_t) *da + index * head->size;
+    ptr_t source = (ptr_t) *da + (index + count) * head->size;
+
+    if (output != NULL) {
+        memcpy(output, dest, count * head->size);
+    }
+    memmove(dest, source, (head->count - index - count) * head->size);
+
+    head->count -= count;
+}
+
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
 // | |_) | |/ _` | __| |_ / _ \| '__| '_ ` _ \  | |   / _` | | | |/ _ \ '__|

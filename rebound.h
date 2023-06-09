@@ -133,6 +133,7 @@ RE_API usize_t re_malloc_size(void *ptr);
 #define re_ptr_to_usize(PTR) ((usize_t) ((u8_t *) (PTR) - (u8_t) 0))
 #define re_usize_to_ptr(N) ((void *) ((u8_t *) + N))
 #define re_offsetof(S, M) re_ptr_to_usize(&((S *) 0)->M)
+#define re_arr_len(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 
@@ -372,6 +373,69 @@ RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
     re_dll_push_front_np(FIRST, LAST, NODE, next, prev)
 #define re_dll_remove(FIRST, LAST, NODE) \
     re_dll_remove_np(FIRST, LAST, NODE, next, prev)
+
+/*=========================*/
+// Dynamic array
+/*=========================*/
+
+#define re_da_t(T) T *
+
+// Lifetime operators
+#define re_da_create(DA, ALLOCATOR) _re_da_create((void **) &(DA), sizeof(*(DA)), (ALLOCATOR))
+#define re_da_destroy(DA) _re_da_destroy((void **) &(DA))
+
+// Ordered operators
+#define re_da_insert(DA, VALUE, INDEX) do { \
+    __typeof__(VALUE) re_macro_var(temp_value) = (VALUE); \
+    _re_da_insert_arr((void **) &(DA), &re_macro_var(temp_value), 1, (INDEX)); \
+} while (0)
+#define re_da_remove(DA, INDEX, OUT) _re_da_remove_arr((void **) &(DA), 1, (INDEX), OUT)
+
+// Fast operators
+#define re_da_insert_fast(DA, VALUE, INDEX) do { \
+    __typeof__(VALUE) re_macro_var(temp_value) = (VALUE); \
+    _re_da_insert_fast((void **) &(DA), &re_macro_var(temp_value), (INDEX)); \
+} while (0)
+#define re_da_remove_fast(DA, INDEX, OUT) _re_da_remove_fast((void **) &(DA), (INDEX), OUT)
+
+// Stack operators
+#define re_da_push(DA, VALUE) re_da_insert_fast(DA, VALUE, re_da_count(DA));
+#define re_da_pop(DA, OUT) re_da_remove_fast(DA, re_da_count(DA) - 1, OUT)
+
+// Array operators
+#define re_da_insert_arr(DA, ARR, COUNT, INDEX) _re_da_insert_arr((void **) &(DA), (ARR), (COUNT), (INDEX))
+#define re_da_remove_arr(DA, COUNT, INDEX, OUT) _re_da_remove_arr((void **) &(DA), (COUNT), (INDEX), (OUT))
+
+// Array stack operators
+#define re_da_push_arr(DA, ARR, COUNT) _re_da_insert_arr((void **) &(DA), (ARR), (COUNT), re_da_count(DA));
+#define re_da_pop_arr(DA, COUNT, OUT) _re_da_remove_arr((void **) &(DA), (COUNT), re_da_count(DA) - (COUNT), (OUT));
+
+// Helpers
+#define re_da_count(DA) _re_da_to_head(DA)->count
+#define re_da_last(DA) ((DA)[re_da_count - 1])
+#define re_da_iter(DA, I) for (usize_t I = 0; I < re_da_count(DA); I++)
+
+// Private API
+#define _RE_DA_INIT_CAP 8
+
+typedef struct _re_da_header_t _re_da_header_t;
+struct _re_da_header_t {
+    re_allocator_t alloc;
+    usize_t size;
+    usize_t count;
+    usize_t cap;
+};
+
+#define _re_da_to_head(DA) ((_re_da_header_t *) ((ptr_t) (DA) - sizeof(_re_da_header_t)))
+#define _re_head_to_da(HEAD) ((void *) ((ptr_t) (HEAD) + sizeof(_re_da_header_t)))
+
+RE_API void _re_da_resize(void **da, usize_t count);
+RE_API void _re_da_create(void **da, usize_t size, re_allocator_t allocator);
+RE_API void _re_da_destroy(void **da);
+RE_API void _re_da_insert_fast(void **da, const void *value, usize_t index);
+RE_API void _re_da_remove_fast(void **da, usize_t index, void *output);
+RE_API void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index);
+RE_API void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output);
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
