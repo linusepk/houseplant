@@ -137,22 +137,32 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 #define re_offsetof(S, M) re_ptr_to_usize(&((S *) 0)->M)
 #define re_arr_len(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
-static const u8_t    U8_MAX    = ~0;
-static const u16_t   U16_MAX   = ~0;
-static const u32_t   U32_MAX   = ~0;
-static const u64_t   U64_MAX   = ~0;
-static const usize_t USIZE_MAX = ~0;
+#define U8_MAX    ((u8_t) ~0)
+#define U16_MAX   ((u16_t) ~0)
+#define U32_MAX   ((u32_t) ~0)
+#define U64_MAX   ((u64_t) ~0)
+#define USIZE_MAX ((usize_t) ~0)
 
-static const i8_t    I8_MIN    = 0 | (i8_t) (1 << 7);
-static const i16_t   I16_MIN   = 0 | (i16_t) (1 << 15);
-static const i32_t   I32_MIN   = 0 | (1 << 31);
-static const i64_t   I64_MIN   = 0 | (1ll << 63);
-static const isize_t ISIZE_MIN = 0 | (1l << (sizeof(isize_t) * 8  -1));
-static const i8_t    I8_MAX = ~I8_MIN;
-static const i16_t   I16_MAX = ~I16_MIN;
-static const i32_t   I32_MAX = ~I32_MIN;
-static const i64_t   I64_MAX = ~I64_MIN;
-static const isize_t ISIZE_MAX = ~ISIZE_MIN;
+#define I8_MIN    ((i8_t)    (0 | (i8_t) (1 << 7)))
+#define I16_MIN   ((i16_t)   (0 | (i16_t) (1 << 15)))
+#define I32_MIN   ((i32_t)   (0 | (i32_t) (1 << 31)))
+#define I64_MIN   ((i64_t)   (0 | (i64_t) (1ll << 63)))
+#define ISIZE_MIN ((isize_t) (0 | (1l << (sizeof(isize_t) * 8  -1))))
+
+#define I8_MAX    ((i8_t)    ~I8_MIN)
+#define I16_MAX   ((i16_t)   ~I16_MIN)
+#define I32_MAX   ((i32_t)   ~I32_MIN)
+#define I64_MAX   ((i64_t)   ~I64_MIN)
+#define ISIZE_MAX ((isize_t) ~ISIZE_MIN)
+
+#define re_bit(N) (1 << (N))
+#define re_bit_set(M, N, V) \
+    ((V) == 1 ? \
+        ((M) |= re_bit(N)) : \
+        ((M) &= ~re_bit(N)) \
+    )
+#define re_bit_get(M, N) \
+    (M) >> (N) & 1
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 
