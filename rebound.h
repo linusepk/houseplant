@@ -51,17 +51,17 @@
 // Basic types
 /*=========================*/
 
-typedef unsigned char     u8_t;
-typedef unsigned short    u16_t;
-typedef unsigned int      u32_t;
-typedef unsigned long int u64_t;
-typedef unsigned long     usize_t;
+typedef unsigned char      u8_t;
+typedef unsigned short     u16_t;
+typedef unsigned int       u32_t;
+typedef unsigned long long u64_t;
+typedef unsigned long      usize_t;
 
-typedef signed char     i8_t;
-typedef signed short    i16_t;
-typedef signed int      i32_t;
-typedef signed long int i64_t;
-typedef signed long     isize_t;
+typedef signed char      i8_t;
+typedef signed short     i16_t;
+typedef signed int       i32_t;
+typedef signed long long i64_t;
+typedef signed long      isize_t;
 
 typedef float  f32_t;
 typedef double f64_t;
@@ -120,6 +120,8 @@ RE_API usize_t re_malloc_size(void *ptr);
 // Utils
 /*=========================*/
 
+typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
+
 #define _re_concat(A, B) A##B
 #define re_concat(A, B) _re_concat(A, B)
 #define re_macro_var(NAME) re_concat(re_concat(UNIQUE_MACRO_ID, __LINE__), NAME)
@@ -135,6 +137,23 @@ RE_API usize_t re_malloc_size(void *ptr);
 #define re_offsetof(S, M) re_ptr_to_usize(&((S *) 0)->M)
 #define re_arr_len(ARR) (sizeof(ARR) / sizeof(ARR[0]))
 
+static const u8_t    U8_MAX    = ~0;
+static const u16_t   U16_MAX   = ~0;
+static const u32_t   U32_MAX   = ~0;
+static const u64_t   U64_MAX   = ~0;
+static const usize_t USIZE_MAX = ~0;
+
+static const i8_t    I8_MIN    = 0 | (i8_t) (1 << 7);
+static const i16_t   I16_MIN   = 0 | (i16_t) (1 << 15);
+static const i32_t   I32_MIN   = 0 | (1 << 31);
+static const i64_t   I64_MIN   = 0 | (1ll << 63);
+static const isize_t ISIZE_MIN = 0 | (1l << (sizeof(isize_t) * 8  -1));
+static const i8_t    I8_MAX = ~I8_MIN;
+static const i16_t   I16_MAX = ~I16_MIN;
+static const i32_t   I32_MAX = ~I32_MIN;
+static const i64_t   I64_MAX = ~I64_MIN;
+static const isize_t ISIZE_MAX = ~ISIZE_MIN;
+
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 
 /*=========================*/
@@ -144,8 +163,6 @@ RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 #define RE_HT_INIT_CAP  8
 #define RE_HT_MAX_FILL  0.75f
 #define RE_HT_GROW_RATE 2
-
-typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 
 typedef void *re_ht_t;
 #define re_ht_t(K, V) struct { \
