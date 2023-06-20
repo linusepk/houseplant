@@ -8,6 +8,8 @@
 /*=========================*/
 
 #include <string.h> // memset
+#include <stdio.h>
+#include <stdarg.h>
 
 //  ____                   _
 // | __ )  __ _ ___  ___  | |    __ _ _   _  ___ _ __
@@ -66,7 +68,8 @@ typedef signed long      isize_t;
 typedef float  f32_t;
 typedef double f64_t;
 
-typedef char b8_t;
+typedef u8_t  b8_t;
+typedef u32_t b32_t;
 #ifndef true
 #define true 1
 #endif // true
@@ -80,45 +83,49 @@ typedef u8_t *ptr_t;
 #endif // NULL
 
 /*=========================*/
-// Allocator interface
+// Allocators
 /*=========================*/
 
-typedef void *(*re_allocactor_reserve_func_t)(usize_t size, void *ctx);
-typedef void (*re_allocator_change_memory_func_t)(void *ptr, usize_t size, void *ctx);
+#if defined(RE_MALLOC) && defined(RE_REALLOC) && defined(RE_FREE)
+#elif !defined(RE_MALLOC) && !defined(RE_REALLOC) && !defined(RE_FREE)
+#else
+#error "Must define all or none of RE_MALLOC, RE_REALLOC and RE_FREE."
+#endif
 
-typedef struct re_allocator_t re_allocator_t;
-struct re_allocator_t {
-    re_allocactor_reserve_func_t reserve;
-    re_allocator_change_memory_func_t commit;
-    re_allocator_change_memory_func_t decommit;
-    re_allocator_change_memory_func_t release;
-    void *ctx;
-};
+#ifndef RE_MALLOC
+#include <stdlib.h>
+#define RE_MALLOC malloc
+#define RE_REALLOC realloc
+#define RE_FREE free
+#endif
 
-RE_API void re_allocator_change_memory_dummy(void *ptr, usize_t size, void *ctx);
+#define OUT_OF_MEMORY "Out of memory"
 
-RE_API void *_re_libc_reserve(usize_t size, void *ctx);
-RE_API void  _re_libc_release(void *ptr, usize_t size, void *ctx);
-
-static const re_allocator_t re_libc_allocator = {
-    _re_libc_reserve,
-    re_allocator_change_memory_dummy,
-    re_allocator_change_memory_dummy,
-    _re_libc_release,
-    NULL
-};
-
-#define re_allocator_null { NULL, NULL, NULL, NULL, NULL }
-
-RE_API void   *re_malloc(usize_t size, re_allocator_t allocator);
-RE_API void   *re_calloc(usize_t n, usize_t size, re_allocator_t allocator);
-RE_API void   *re_realloc(void *ptr, usize_t size, re_allocator_t allocator);
-RE_API void    re_free(void *ptr, re_allocator_t allocator);
-RE_API usize_t re_malloc_size(void *ptr);
+RE_API void *re_malloc(usize_t size);
+RE_API void *re_realloc(void *ptr, usize_t size);
+RE_API void  re_free(void *ptr);
 
 /*=========================*/
 // Utils
 /*=========================*/
+
+#define RE_ABORT(error, ...) do { \
+    char buffer[1024]; \
+    _re_macro_va_string_expansion(buffer, error, __VA_ARGS__); \
+    fprintf(stderr, "ABORT %s:%d: %s.\n", __FILE__, __LINE__, buffer); \
+    abort(); \
+} while (0)
+
+#define RE_ENSURE(cond, error, ...) do { \
+    if (!(cond)) { \
+        fprintf(stderr, "Condition not met: %s.\n", #cond); \
+        RE_ABORT(error, __VA_ARGS__); \
+    } \
+} while (0)
+
+#ifdef RE_DEBUG
+#define RE_ASSERT(cond, error) RE_ENSURE(cond, error)
+#endif
 
 typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 
@@ -165,6 +172,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (M) >> (N) & 1
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
+RE_API void _re_macro_va_string_expansion(char buffer[1024], const char *fmt, ...);
 
 /*=========================*/
 // Hash table
@@ -184,7 +192,6 @@ typedef void *re_ht_t;
     } *entries; \
     usize_t count; \
     usize_t capacity; \
-    re_allocator_t allocator; \
     usize_t key_size; \
     K temp_key; \
     re_hash_func_t hash_func; \
@@ -204,8 +211,7 @@ typedef void *re_ht_t;
 #define _re_ht_resize(HT) do { \
     usize_t re_macro_var(new_cap) = (HT)->capacity * RE_HT_GROW_RATE; \
     usize_t re_macro_var(size) = re_macro_var(new_cap) * sizeof(__typeof__(*(HT)->entries)); \
-    __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(re_macro_var(size), (HT)->allocator.ctx); \
-    (HT)->allocator.commit(re_macro_var(new_entries), re_macro_var(size), (HT)->allocator.ctx); \
+    __typeof__((HT)->entries) re_macro_var(new_entries) = re_malloc(re_macro_var(size)); \
     memset(re_macro_var(new_entries), 0, re_macro_var(size)); \
     for (usize_t i = 0; i < (HT)->capacity; i++) { \
         __typeof__(*(HT)->entries) re_macro_var(old) = (HT)->entries[i]; \
@@ -216,27 +222,24 @@ typedef void *re_ht_t;
         _re_ht_get_entry(re_macro_var(new_entries), re_macro_var(new_cap), re_macro_var(old).hash, re_macro_var(entry)); \
         *re_macro_var(entry) = re_macro_var(old); \
     } \
-    (HT)->allocator.release((HT)->entries, (HT)->capacity * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
+    re_free((HT)->entries); \
     (HT)->entries = re_macro_var(new_entries); \
     (HT)->capacity = re_macro_var(new_cap); \
 } while (0)
 
-#define re_ht_create(HT, ALLOC, HASH_FUNC) do { \
-    (HT) = (ALLOC).reserve(sizeof(__typeof__(*(HT))), (ALLOC).ctx); \
-    (ALLOC).commit((HT), sizeof(__typeof__(*(HT))), (ALLOC).ctx); \
-    (HT)->entries = (ALLOC).reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
-    (ALLOC).commit((HT)->entries, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (ALLOC).ctx); \
+#define re_ht_create(HT, HASH_FUNC) do { \
+    (HT) = re_malloc(sizeof(__typeof__(*(HT)))); \
+    (HT)->entries = re_malloc(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
     memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
     (HT)->count = 0; \
     (HT)->capacity = RE_HT_INIT_CAP; \
-    (HT)->allocator = (ALLOC); \
     (HT)->key_size = sizeof((HT)->temp_key); \
     (HT)->hash_func = (HASH_FUNC); \
 } while (0)
 
 #define re_ht_destroy(HT) do { \
-    (HT)->allocator.release((HT)->entries, sizeof(__typeof__(*(HT)->entries)) * (HT)->capacity, (HT)->allocator.ctx); \
-    (HT)->allocator.release((HT), sizeof(*(HT)), (HT)->allocator.ctx); \
+    re_free((HT)->entries); \
+    re_free((HT)); \
     (HT) = NULL; \
 } while (0)
 
@@ -279,10 +282,9 @@ typedef void *re_ht_t;
 } while (0)
 
 #define re_ht_clear(HT) do { \
-    __typeof__((HT)->entries) re_macro_var(new_entries) = (HT)->allocator.reserve(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
-    (HT)->allocator.commit(re_macro_var(new_entries), RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries)), (HT)->allocator.ctx); \
-    re_memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
-    (HT)->allocator.release((HT)->entries, sizeof(__typeof__(*(HT)->entries)) * (HT)->capacity, (HT)->allocator.ctx); \
+    __typeof__((HT)->entries) re_macro_var(new_entries) = re_malloc(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
+    memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
+    re_free((HT)->entries); \
     (HT)->entries = re_macro_var(new_entries); \
     (HT)->capacity = RE_HT_INIT_CAP; \
     (HT)->count = 0; \
@@ -323,6 +325,7 @@ struct re_str_t {
 
 #define re_str_null { 0, NULL }
 #define re_str_lit(str) re_str(str, sizeof(str) - 1)
+#define re_str_cstr(str) re_str(str, strlen(str))
 RE_API re_str_t re_str(const char *cstr, usize_t len);
 RE_API re_str_t re_str_sub(re_str_t string, usize_t start, usize_t end);
 RE_API re_str_t re_str_prefix(re_str_t string, usize_t len);
@@ -408,19 +411,19 @@ RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
 #define re_da_t(T) T *
 
 // Lifetime operators
-#define re_da_create(DA, ALLOCATOR) _re_da_create((void **) &(DA), sizeof(*(DA)), (ALLOCATOR))
+#define re_da_create(DA) _re_da_create((void **) &(DA), sizeof(*(DA)))
 #define re_da_destroy(DA) _re_da_destroy((void **) &(DA))
 
 // Ordered operators
 #define re_da_insert(DA, VALUE, INDEX) do { \
-    __typeof__(VALUE) re_macro_var(temp_value) = (VALUE); \
+    __typeof__(*DA) re_macro_var(temp_value) = (VALUE); \
     _re_da_insert_arr((void **) &(DA), &re_macro_var(temp_value), 1, (INDEX)); \
 } while (0)
 #define re_da_remove(DA, INDEX, OUT) _re_da_remove_arr((void **) &(DA), 1, (INDEX), OUT)
 
 // Fast operators
 #define re_da_insert_fast(DA, VALUE, INDEX) do { \
-    __typeof__(VALUE) re_macro_var(temp_value) = (VALUE); \
+    __typeof__(*DA) re_macro_var(temp_value) = (VALUE); \
     _re_da_insert_fast((void **) &(DA), &re_macro_var(temp_value), (INDEX)); \
 } while (0)
 #define re_da_remove_fast(DA, INDEX, OUT) _re_da_remove_fast((void **) &(DA), (INDEX), OUT)
@@ -439,7 +442,7 @@ RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
 
 // Helpers
 #define re_da_count(DA) _re_da_to_head(DA)->count
-#define re_da_last(DA) ((DA)[re_da_count - 1])
+#define re_da_last(DA) ((DA)[re_da_count(DA) - 1])
 #define re_da_iter(DA, I) for (usize_t I = 0; I < re_da_count(DA); I++)
 
 // Private API
@@ -447,7 +450,6 @@ RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
 
 typedef struct _re_da_header_t _re_da_header_t;
 struct _re_da_header_t {
-    re_allocator_t alloc;
     usize_t size;
     usize_t count;
     usize_t cap;
@@ -457,7 +459,7 @@ struct _re_da_header_t {
 #define _re_head_to_da(HEAD) ((void *) ((ptr_t) (HEAD) + sizeof(_re_da_header_t)))
 
 RE_API void _re_da_resize(void **da, usize_t count);
-RE_API void _re_da_create(void **da, usize_t size, re_allocator_t allocator);
+RE_API void _re_da_create(void **da, usize_t size);
 RE_API void _re_da_destroy(void **da);
 RE_API void _re_da_insert_fast(void **da, const void *value, usize_t index);
 RE_API void _re_da_remove_fast(void **da, usize_t index, void *output);
@@ -480,31 +482,9 @@ typedef struct re_lib_t re_lib_t;
 
 typedef void (*re_func_ptr_t)(void);
 
-RE_API re_lib_t     *re_lib_load(const char *path, re_allocator_t allocator);
+RE_API re_lib_t     *re_lib_load(const char *path);
 RE_API void          re_lib_unload(re_lib_t *lib);
 RE_API re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name);
-
-/*=========================*/
-// Allocators
-/*=========================*/
-
-RE_API void *re_os_reserve(usize_t size);
-RE_API void  re_os_commit(void *ptr, usize_t size);
-RE_API void  re_os_decommit(void *ptr, usize_t size);
-RE_API void  re_os_release(void *ptr, usize_t size);
-
-RE_API void *_re_os_reserve(usize_t size, void *ctx);
-RE_API void  _re_os_commit(void *ptr, usize_t size, void *ctx);
-RE_API void  _re_os_decommit(void *ptr, usize_t size, void *ctx);
-RE_API void  _re_os_release(void *ptr, usize_t size, void *ctx);
-
-static const re_allocator_t re_os_allocator = {
-    _re_os_reserve,
-    _re_os_commit,
-    _re_os_decommit,
-    _re_os_release,
-    NULL
-};
 
 /*=========================*/
 // Multithreading
@@ -526,7 +506,7 @@ RE_API void        re_thread_wait(re_thread_t thread);
 // Mutexes
 typedef struct re_mutex_t re_mutex_t;
 
-RE_API re_mutex_t *re_mutex_create(re_allocator_t alloc);
+RE_API re_mutex_t *re_mutex_create(void);
 RE_API void        re_mutex_destroy(re_mutex_t *mutex);
 RE_API void        re_mutex_lock(re_mutex_t *mutex);
 RE_API void        re_mutex_unlock(re_mutex_t *mutex);

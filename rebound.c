@@ -17,67 +17,23 @@
 // Base layer
 
 /*=========================*/
-// Allocator interface
+// Allocators
 /*=========================*/
 
-void re_allocator_change_memory_dummy(void *ptr, usize_t size, void *ctx) {
-    (void) ptr;
-    (void) size;
-    (void) ctx;
-}
-
-void *_re_libc_reserve(usize_t size, void *ctx) {
-    (void) ctx;
-    return malloc(size);
-}
-
-void _re_libc_release(void *ptr, usize_t size, void *ctx) {
-    (void) size;
-    (void) ctx;
-    free(ptr);
-}
-
-void *re_malloc(usize_t size, re_allocator_t allocator) {
-    usize_t new_size = size + sizeof(usize_t);
-    usize_t *ptr = allocator.reserve(new_size, allocator.ctx);
-    if (!ptr) {
-        return NULL;
-    }
-    allocator.commit(ptr, new_size, allocator.ctx);
-    *ptr = size;
-    return (ptr_t) ptr + sizeof(usize_t);
-}
-
-void *re_calloc(usize_t n, usize_t size, re_allocator_t allocator) {
-    void *ptr = re_malloc(size * n, allocator);
-    if (!ptr) {
-        return NULL;
-    }
-    memset(ptr, 0, size * n);
+void *re_malloc(usize_t size) {
+    void *ptr = RE_MALLOC(size);
+    RE_ENSURE(ptr != NULL, OUT_OF_MEMORY, NULL);
     return ptr;
 }
 
-void *re_realloc(void *ptr, usize_t size, re_allocator_t allocator) {
-    usize_t old_size = re_malloc_size(ptr);
-    if (old_size >= size) {
-        return ptr;
-    }
-    void *new_ptr = re_malloc(size, allocator);
-    if (!new_ptr) {
-        return NULL;
-    }
-    memcpy(new_ptr, ptr, old_size);
-    re_free(ptr, allocator);
+void *re_realloc(void *ptr, usize_t size) {
+    void *new_ptr = RE_REALLOC(ptr, size);
+    RE_ENSURE(new_ptr != NULL, OUT_OF_MEMORY, NULL);
     return new_ptr;
 }
 
-void re_free(void *ptr, re_allocator_t allocator) {
-    usize_t size = re_malloc_size(ptr);
-    allocator.release((ptr_t) ptr - sizeof(usize_t), size, allocator.ctx);
-}
-
-usize_t re_malloc_size(void *ptr) {
-    return *(usize_t *) ((ptr_t) ptr - sizeof(usize_t));
+void re_free(void *ptr) {
+    RE_FREE(ptr);
 }
 
 /*=========================*/
@@ -91,6 +47,13 @@ usize_t re_fvn1a_hash(const char *key, usize_t len) {
         hash *= 16777619;
     }
     return hash;
+}
+
+void _re_macro_va_string_expansion(char buffer[1024], const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vsprintf(buffer, fmt, args);
+    va_end(args);
 }
 
 /*=========================*/
@@ -195,7 +158,7 @@ void _re_da_resize(void **da, usize_t count) {
         return;
     }
 
-    void *new_head = re_realloc(head, sizeof(_re_da_header_t) + head->size * head->cap, head->alloc);
+    void *new_head = re_realloc(head, sizeof(_re_da_header_t) + head->size * head->cap);
     if (!new_head) {
         *da = NULL;
         return;
@@ -203,14 +166,13 @@ void _re_da_resize(void **da, usize_t count) {
     *da = _re_head_to_da(new_head);
 }
 
-void _re_da_create(void **da, usize_t size, re_allocator_t allocator) {
+void _re_da_create(void **da, usize_t size) {
     usize_t total_size = sizeof(_re_da_header_t) + size * _RE_DA_INIT_CAP;
-    _re_da_header_t *head = re_malloc(total_size, allocator);
+    _re_da_header_t *head = re_malloc(total_size);
     if (!head) {
         *da = NULL;
         return;
     }
-    head->alloc = allocator;
     head->size = size;
     head->count = 0;
     head->cap = _RE_DA_INIT_CAP;
@@ -220,7 +182,7 @@ void _re_da_create(void **da, usize_t size, re_allocator_t allocator) {
 
 void _re_da_destroy(void **da) {
     _re_da_header_t *head = _re_da_to_head(*da);
-    re_free(head, head->alloc);
+    re_free(head);
     *da = NULL;
 }
 
@@ -304,12 +266,10 @@ void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output) {
 
 struct re_lib_t {
     void *handle;
-    re_allocator_t alloc;
     b8_t valid;
 };
 
 struct re_mutex_t {
-    re_allocator_t alloc;
     pthread_mutex_t handle;
 };
 
@@ -317,11 +277,9 @@ struct re_mutex_t {
 // Dynamic library loading
 /*=========================*/
 
-re_lib_t *re_lib_load(const char *path, re_allocator_t allocator) {
-    re_lib_t *lib = allocator.reserve(sizeof(re_lib_t), allocator.ctx);
-    allocator.commit(lib, sizeof(re_lib_t), allocator.ctx);
+re_lib_t *re_lib_load(const char *path) {
+    re_lib_t *lib = re_malloc(sizeof(re_lib_t));
     *lib = (re_lib_t) {0};
-    lib->alloc = allocator;
     lib->handle = dlopen(path, RTLD_LAZY);
     if (lib->handle != NULL) {
         lib->valid = true;
@@ -337,7 +295,7 @@ void re_lib_unload(re_lib_t *lib) {
     dlclose(lib->handle);
     lib->handle = NULL;
     lib->valid = false;
-    lib->alloc.release(lib, sizeof(re_lib_t), lib->alloc.ctx);
+    re_free(lib);
 }
 
 re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name) {
@@ -395,17 +353,15 @@ void re_thread_wait(re_thread_t thread) {
 }
 
 // Mutexes
-re_mutex_t *re_mutex_create(re_allocator_t alloc) {
-    re_mutex_t *mutex = alloc.reserve(sizeof(re_mutex_t), alloc.ctx);
-    alloc.commit(mutex, sizeof(re_mutex_t), alloc.ctx);
-    mutex->alloc = alloc;
+re_mutex_t *re_mutex_create(void) {
+    re_mutex_t *mutex = re_malloc(sizeof(re_mutex_t));
     mutex->handle = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
     return mutex;
 }
 
 void re_mutex_destroy(re_mutex_t *mutex) {
     pthread_mutex_destroy(&mutex->handle);
-    mutex->alloc.release(mutex, sizeof(re_mutex_t), mutex->alloc.ctx);
+    re_free(mutex);
 }
 
 void re_mutex_lock(re_mutex_t *mutex)   { pthread_mutex_lock(&mutex->handle); }
