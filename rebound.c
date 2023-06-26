@@ -22,13 +22,13 @@
 
 void *re_malloc(usize_t size) {
     void *ptr = RE_MALLOC(size);
-    RE_ENSURE(ptr != NULL, OUT_OF_MEMORY, NULL);
+    RE_ENSURE(ptr != NULL, OUT_OF_MEMORY);
     return ptr;
 }
 
 void *re_realloc(void *ptr, usize_t size) {
     void *new_ptr = RE_REALLOC(ptr, size);
-    RE_ENSURE(new_ptr != NULL, OUT_OF_MEMORY, NULL);
+    RE_ENSURE(new_ptr != NULL, OUT_OF_MEMORY);
     return new_ptr;
 }
 
@@ -49,7 +49,7 @@ usize_t re_fvn1a_hash(const char *key, usize_t len) {
     return hash;
 }
 
-void _re_macro_va_string_expansion(char buffer[1024], const char *fmt, ...) {
+void re_format_string(char buffer[1024], const char *fmt, ...)  {
     va_list args;
     va_start(args, fmt);
     vsprintf(buffer, fmt, args);
@@ -250,6 +250,178 @@ void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output) {
     head->count -= count;
 }
 
+/*=========================*/
+// Logger
+/*=========================*/
+
+typedef struct _re_logger_callback_t _re_logger_callback_t;
+struct _re_logger_callback_t {
+    re_log_callback_t func;
+    re_log_level_t level;
+    void *user_data;
+};
+
+typedef struct _re_logger_t _re_logger_t;
+struct _re_logger_t {
+    b8_t silent;
+    _re_logger_callback_t callbacks[32];
+    u32_t callback_i;
+    re_log_level_t level;
+};
+
+static _re_logger_t _re_logger = { .level = RE_LOG_LEVEL_TRACE };
+static const char *_re_log_level_string[RE_LOG_LEVEL_COUNT] = {
+    "FATAL",
+    "ERROR",
+    "WARN",
+    "INFO",
+    "DEBUG",
+    "TRACE"
+};
+
+
+static void _re_log_stdout_callback(re_log_event_t *const event) {
+    FILE *fp = event->level < RE_LOG_LEVEL_WARN ? stdout : stderr;
+
+#ifndef RE_LOG_NO_COLOR
+    static const char *level_color[RE_LOG_LEVEL_COUNT] = {
+        "\033[1;101m",
+        "\033[1;91m",
+        "\033[0;93m",
+        "\033[0;92m",
+        "\033[0;94m",
+        "\033[0;95m"
+    };
+
+    u32_t i = 0;
+    while (event->message[i] != '\0') {
+        fprintf(fp,
+                "\033[2;37m%.2d:%.2d:%.2d\033[0m %s%-5s\033[0m \033[2;37m%s:%d: \033[0m",
+                event->time.hour, event->time.min, event->time.sec,
+                level_color[event->level],
+                _re_log_level_string[event->level],
+                event->file,
+                event->line);
+
+        u32_t start = i;
+        while (event->message[i] != '\n' && event->message[i] != '\0') {
+            i++;
+        }
+        u32_t end = i;
+
+        fprintf(fp, "%.*s\n", end - start, event->message + start);
+        i++;
+    }
+#else
+    u32_t i = 0;
+    while (event->message[i] != '\0') {
+        fprintf(fp,
+                "%.2d:%.2d:%.2d %-5s %s:%d: ",
+                event->time.hour, event->time.min, event->time.sec,
+                _re_log_level_string[event->level],
+                event->file,
+                event->line);
+
+        u32_t start = i;
+        while (event->message[i] != '\n' && event->message[i] != '\0') {
+            i++;
+        }
+        u32_t end = i;
+
+        fprintf(fp, "%.*s\n", end - start, event->message + start);
+        i++;
+    }
+#endif
+}
+
+static void _re_log_file_callback(re_log_event_t *const event) {
+    u32_t i = 0;
+    while (event->message[i] != '\0') {
+        fprintf(event->user_data,
+                "%.2d:%.2d:%.2d %-5s %s:%d: ",
+                event->time.hour, event->time.min, event->time.sec,
+                _re_log_level_string[event->level],
+                event->file,
+                event->line);
+
+        u32_t start = i;
+        while (event->message[i] != '\n' && event->message[i] != '\0') {
+            i++;
+        }
+        u32_t end = i;
+
+        fprintf(event->user_data, "%.*s\n", end - start, event->message + start);
+        i++;
+    }
+
+    fflush(event->user_data);
+}
+
+
+void _re_log(
+        const char *file,
+        i32_t line,
+        re_log_level_t level,
+        const char *fmt,
+        ...) {
+    isize_t t = time(NULL);
+    struct tm *tm = localtime(&t);
+
+    re_log_event_t event = {
+        .file = file,
+        .line = line,
+        .level = level,
+        .time = {
+            .hour = tm->tm_hour,
+            .min = tm->tm_min,
+            .sec = tm->tm_sec,
+        }
+    };
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(event.message, RE_LOG_MESSAGE_MAX_LENGTH, fmt, args);
+    va_end(args);
+    event.message_length = strlen(event.message);
+
+    if (!_re_logger.silent && level <= _re_logger.level) {
+        _re_log_stdout_callback(&event);
+    }
+
+    for (u32_t i = 0; i < _re_logger.callback_i; i++) {
+        if (level <= _re_logger.callbacks[i].level) {
+            event.user_data = _re_logger.callbacks[i].user_data;
+            _re_logger.callbacks[i].func(&event);
+        }
+    }
+}
+
+void re_logger_add_callback(
+        re_log_callback_t callback,
+        re_log_level_t level,
+        void *user_data) {
+    RE_ASSERT(_re_logger.callback_i < RE_LOGGER_CALLBACK_MAX,
+            "Can't surpace %d logger callbacks", RE_LOGGER_CALLBACK_MAX);
+
+    _re_logger.callbacks[_re_logger.callback_i++] = (_re_logger_callback_t) {
+        .func = callback,
+        .level = level,
+        .user_data = user_data
+    };
+}
+
+void re_logger_add_fp(FILE *fp, re_log_level_t level) {
+    re_logger_add_callback(_re_log_file_callback, level, fp);
+}
+
+void re_logger_set_silent(b8_t silent) {
+    _re_logger.silent = silent;
+}
+
+void re_logger_set_level(re_log_level_t level) {
+    _re_logger.level = level;
+}
+
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
 // | |_) | |/ _` | __| |_ / _ \| '__| '_ ` _ \  | |   / _` | | | |/ _ \ '__|
@@ -310,29 +482,6 @@ re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name) {
 }
 
 /*=========================*/
-// Allocators
-/*=========================*/
-
-void *re_os_reserve(usize_t size) {
-    void *ptr = mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANON, -1, 0);
-    return ptr;
-}
-
-void re_os_commit(void *ptr, usize_t size) {
-    mprotect(ptr, size, PROT_READ | PROT_WRITE);
-    madvise(ptr, size, MADV_WILLNEED);
-}
-
-void re_os_decommit(void *ptr, usize_t size) {
-    mprotect(ptr, size, PROT_NONE);
-    madvise(ptr, size, MADV_DONTNEED);
-}
-
-void re_os_release(void *ptr, usize_t size) {
-    munmap(ptr, size);
-}
-
-/*=========================*/
 // Multithreading
 /*=========================*/
 
@@ -368,23 +517,3 @@ void re_mutex_lock(re_mutex_t *mutex)   { pthread_mutex_lock(&mutex->handle); }
 void re_mutex_unlock(re_mutex_t *mutex) { pthread_mutex_unlock(&mutex->handle); }
 
 #endif // RE_OS_LINUX
-
-void *_re_os_reserve(usize_t size, void *ctx) {
-    (void) ctx;
-    return re_os_reserve(size);
-}
-
-void _re_os_commit(void *ptr, usize_t size, void *ctx) {
-    (void) ctx;
-    re_os_commit(ptr, size);
-}
-
-void _re_os_decommit(void *ptr, usize_t size, void *ctx) {
-    (void) ctx;
-    re_os_decommit(ptr, size);
-}
-
-void _re_os_release(void *ptr, usize_t size, void *ctx) {
-    (void) ctx;
-    re_os_release(ptr, size);
-}

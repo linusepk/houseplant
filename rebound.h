@@ -109,22 +109,24 @@ RE_API void  re_free(void *ptr);
 // Utils
 /*=========================*/
 
-#define RE_ABORT(error, ...) do { \
+#define RE_ABORT(...) do { \
     char buffer[1024]; \
-    _re_macro_va_string_expansion(buffer, error, __VA_ARGS__); \
-    fprintf(stderr, "ABORT %s:%d: %s.\n", __FILE__, __LINE__, buffer); \
+    re_format_string(buffer, __VA_ARGS__); \
+    re_log_fatal("ABORT: %s", buffer); \
     abort(); \
 } while (0)
 
-#define RE_ENSURE(cond, error, ...) do { \
+#define RE_ENSURE(cond, ...) do { \
     if (!(cond)) { \
-        fprintf(stderr, "Condition not met: %s.\n", #cond); \
-        RE_ABORT(error, __VA_ARGS__); \
+        re_log_error("Condition '%s' not met.", #cond); \
+        RE_ABORT(__VA_ARGS__); \
     } \
 } while (0)
 
 #ifdef RE_DEBUG
-#define RE_ASSERT(cond, error) RE_ENSURE(cond, error)
+#define RE_ASSERT(cond, ...) RE_ENSURE(cond, __VA_ARGS__)
+#else
+#define RE_ASSERT(cond, ...)
 #endif
 
 typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
@@ -172,14 +174,14 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (M) >> (N) & 1
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
-RE_API void _re_macro_va_string_expansion(char buffer[1024], const char *fmt, ...);
+RE_API void re_format_string(char buffer[1024], const char *fmt, ...);
 
 /*=========================*/
 // Hash table
 /*=========================*/
 
 #define RE_HT_INIT_CAP  8
-#define RE_HT_MAX_FILL  0.75f
+#define RE_HT_MAX_FILL  0.5f
 #define RE_HT_GROW_RATE 2
 
 typedef void *re_ht_t;
@@ -465,6 +467,70 @@ RE_API void _re_da_insert_fast(void **da, const void *value, usize_t index);
 RE_API void _re_da_remove_fast(void **da, usize_t index, void *output);
 RE_API void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index);
 RE_API void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output);
+
+/*=========================*/
+// Logger
+/*=========================*/
+
+#define RE_LOG_MESSAGE_MAX_LENGTH 1024
+#define RE_LOGGER_CALLBACK_MAX 32
+
+typedef enum {
+    RE_LOG_LEVEL_FATAL,
+    RE_LOG_LEVEL_ERROR,
+    RE_LOG_LEVEL_WARN,
+    RE_LOG_LEVEL_INFO,
+    RE_LOG_LEVEL_DEBUG,
+    RE_LOG_LEVEL_TRACE,
+
+    RE_LOG_LEVEL_COUNT
+} re_log_level_t;
+
+typedef struct re_log_event_t re_log_event_t;
+struct re_log_event_t {
+    char message[RE_LOG_MESSAGE_MAX_LENGTH];
+    u32_t message_length;
+    const char *file;
+    i32_t line;
+    re_log_level_t level;
+    void *user_data;
+    struct {
+        u8_t hour;
+        u8_t min;
+        u8_t sec;
+    } time;
+};
+
+typedef void (*re_log_callback_t)(re_log_event_t *const event);
+
+RE_API void re_logger_add_callback(
+        re_log_callback_t callback,
+        re_log_level_t level,
+        void *user_data);
+RE_API void re_logger_add_fp(FILE *fp, re_log_level_t level);
+RE_API void re_logger_set_silent(b8_t silent);
+RE_API void re_logger_set_level(re_log_level_t level);
+
+#define re_log_fatal(...) \
+    _re_log(__FILE__, __LINE__, RE_LOG_LEVEL_FATAL, __VA_ARGS__)
+#define re_log_error(...) \
+    _re_log(__FILE__, __LINE__, RE_LOG_LEVEL_ERROR, __VA_ARGS__)
+#define re_log_warn(...) \
+    _re_log(__FILE__, __LINE__, RE_LOG_LEVEL_WARN, __VA_ARGS__)
+#define re_log_info(...) \
+    _re_log(__FILE__, __LINE__, RE_LOG_LEVEL_INFO, __VA_ARGS__)
+#define re_log_debug(...) \
+    _re_log(__FILE__, __LINE__, RE_LOG_LEVEL_DEBUG, __VA_ARGS__)
+#define re_log_trace(...) \
+    _re_log(__FILE__, __LINE__, RE_LOG_LEVEL_TRACE, __VA_ARGS__)
+
+// Private API
+RE_API void _re_log(
+        const char *file,
+        i32_t line,
+        re_log_level_t level,
+        const char *fmt,
+        ...);
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
