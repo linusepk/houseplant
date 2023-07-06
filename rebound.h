@@ -49,6 +49,12 @@
     #define RE_API extern
 #endif
 
+#ifdef RE_OS_LINUX
+#define RE_FORMAT_FUNCTION(FORMAT_INDEX, VA_INDEX) __attribute__((format(printf, FORMAT_INDEX, VA_INDEX)))
+#else
+#define RE_FORMAT_FUNCTION(FORMAT_INDEX, VA_INDEX)
+#endif
+
 /*=========================*/
 // Basic types
 /*=========================*/
@@ -70,6 +76,7 @@ typedef double f64_t;
 
 typedef u8_t  b8_t;
 typedef u32_t b32_t;
+
 #ifndef true
 #define true 1
 #endif // true
@@ -174,7 +181,7 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (M) >> (N) & 1
 
 RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
-RE_API void re_format_string(char buffer[1024], const char *fmt, ...);
+RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_FUNCTION(2, 3);
 
 /*=========================*/
 // Hash table
@@ -530,7 +537,7 @@ RE_API void _re_log(
         i32_t line,
         re_log_level_t level,
         const char *fmt,
-        ...);
+        ...) RE_FORMAT_FUNCTION(4, 5);
 
 /*=========================*/
 // Math
