@@ -480,9 +480,33 @@ re_ivec2_t re_ivec2_rotate(re_ivec2_t vec, f32_t degrees) {
 }
 
 re_ivec2_t re_ivec2_normalize(re_ivec2_t vec) { return re_ivec2_muls(vec, 1.0f / re_ivec2_magnitude(vec)); }
-i32_t re_ivec2_magnitude(re_ivec2_t vec) { return sqrtf(vec.x*vec.x + vec.y*vec.y); }
+f32_t re_ivec2_magnitude(re_ivec2_t vec) { return sqrtf(vec.x*vec.x + vec.y*vec.y); }
 i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b) { return a.x*b.y - a.y*b.x; }
 i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b) { return a.x*b.x + a.y*b.y; }
+
+re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z) { return (re_vec3_t) {x, y, z}; }
+re_vec3_t re_vec3s(f32_t scaler) { return re_vec3(scaler, scaler, scaler); }
+
+re_vec3_t re_vec3_mul(re_vec3_t a, re_vec3_t b) { return re_vec3(a.x * b.x, a.y * b.y, a.z * b.z); }
+re_vec3_t re_vec3_div(re_vec3_t a, re_vec3_t b) { return re_vec3(a.x / b.x, a.y / b.y, a.z / b.z); }
+re_vec3_t re_vec3_add(re_vec3_t a, re_vec3_t b) { return re_vec3(a.x + b.x, a.y + b.y, a.z + b.z); }
+re_vec3_t re_vec3_sub(re_vec3_t a, re_vec3_t b) { return re_vec3(a.x - b.x, a.y - b.y, a.z - b.z); }
+
+re_vec3_t re_vec3_muls(re_vec3_t vec, f32_t scaler) { return re_vec3(vec.x * scaler, vec.y * scaler, vec.z * scaler); }
+re_vec3_t re_vec3_divs(re_vec3_t vec, f32_t scaler) { return re_vec3(vec.x / scaler, vec.y / scaler, vec.z / scaler); }
+re_vec3_t re_vec3_adds(re_vec3_t vec, f32_t scaler) { return re_vec3(vec.x + scaler, vec.y + scaler, vec.z + scaler); }
+re_vec3_t re_vec3_subs(re_vec3_t vec, f32_t scaler) { return re_vec3(vec.x - scaler, vec.y - scaler, vec.z - scaler); }
+
+re_vec3_t re_vec3_normalize(re_vec3_t vec) { return re_vec3_muls(vec, 1.0f / re_vec3_magnitude(vec)); }
+f32_t re_vec3_magnitude(re_vec3_t vec) { return sqrtf(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z); }
+re_vec3_t re_vec3_cross(re_vec3_t a, re_vec3_t b) {
+    return re_vec3(
+            a.y * b.z - a.z * b.y,
+            a.z * b.x - a.x * b.z,
+            a.x * b.y - a.y * b.x
+        );
+}
+f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b) { return a.x*b.x + a.y*b.y + a.z*b.z; }
 
 re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t) {x, y, z}; }
 re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }

@@ -585,9 +585,32 @@ RE_API re_ivec2_t re_ivec2_subs(re_ivec2_t vec, i32_t scaler);
 RE_API re_ivec2_t re_ivec2_rotate(re_ivec2_t vec, f32_t degrees);
 
 RE_API re_ivec2_t re_ivec2_normalize(re_ivec2_t vec);
-RE_API i32_t re_ivec2_magnitude(re_ivec2_t vec);
+RE_API f32_t re_ivec2_magnitude(re_ivec2_t vec);
 RE_API i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b);
 RE_API i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b);
+
+typedef struct re_vec3_t re_vec3_t;
+struct re_vec3_t {
+    f32_t x, y, z;
+};
+
+RE_API re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z);
+RE_API re_vec3_t re_vec3s(f32_t scaler);
+
+RE_API re_vec3_t re_vec3_mul(re_vec3_t a, re_vec3_t b);
+RE_API re_vec3_t re_vec3_div(re_vec3_t a, re_vec3_t b);
+RE_API re_vec3_t re_vec3_add(re_vec3_t a, re_vec3_t b);
+RE_API re_vec3_t re_vec3_sub(re_vec3_t a, re_vec3_t b);
+
+RE_API re_vec3_t re_vec3_muls(re_vec3_t vec, f32_t scaler);
+RE_API re_vec3_t re_vec3_divs(re_vec3_t vec, f32_t scaler);
+RE_API re_vec3_t re_vec3_adds(re_vec3_t vec, f32_t scaler);
+RE_API re_vec3_t re_vec3_subs(re_vec3_t vec, f32_t scaler);
+
+RE_API re_vec3_t re_vec3_normalize(re_vec3_t vec);
+RE_API f32_t re_vec3_magnitude(re_vec3_t vec);
+RE_API re_vec3_t re_vec3_cross(re_vec3_t a, re_vec3_t b);
+RE_API f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b);
 
 typedef struct re_ivec3_t re_ivec3_t;
 struct re_ivec3_t {
