@@ -6,7 +6,13 @@
 #include <pthread.h>
 #endif
 
+#ifdef RE_OS_WINDOWS
+#include <windows.h>
+#endif
+
 #include <stdlib.h>
+#include <time.h>
+#include <math.h>
 
 //  ____                   _
 // | __ )  __ _ ___  ___  | |    __ _ _   _  ___ _ __
@@ -364,7 +370,7 @@ void _re_log(
         re_log_level_t level,
         const char *fmt,
         ...) {
-    isize_t t = time(NULL);
+    time_t t = time(NULL);
     struct tm *tm = localtime(&t);
 
     re_log_event_t event = {
@@ -420,6 +426,92 @@ void re_logger_set_silent(b8_t silent) {
 
 void re_logger_set_level(re_log_level_t level) {
     _re_logger.level = level;
+}
+
+/*=========================*/
+// Math
+/*=========================*/
+
+re_vec2_t re_vec2(f32_t x, f32_t y) { return (re_vec2_t) {x, y}; }
+re_vec2_t re_vec2s(f32_t scaler) { return re_vec2(scaler, scaler); }
+
+re_vec2_t re_vec2_mul(re_vec2_t a, re_vec2_t b) { return re_vec2(a.x * b.x, a.y * b.y); }
+re_vec2_t re_vec2_div(re_vec2_t a, re_vec2_t b) { return re_vec2(a.x / b.x, a.y / b.y); }
+re_vec2_t re_vec2_add(re_vec2_t a, re_vec2_t b) { return re_vec2(a.x + b.x, a.y + b.y); }
+re_vec2_t re_vec2_sub(re_vec2_t a, re_vec2_t b) { return re_vec2(a.x - b.x, a.y - b.y); }
+
+re_vec2_t re_vec2_muls(re_vec2_t vec, f32_t scaler) { return re_vec2(vec.x * scaler, vec.y * scaler); }
+re_vec2_t re_vec2_divs(re_vec2_t vec, f32_t scaler) { return re_vec2(vec.x / scaler, vec.y / scaler); }
+re_vec2_t re_vec2_adds(re_vec2_t vec, f32_t scaler) { return re_vec2(vec.x + scaler, vec.y + scaler); }
+re_vec2_t re_vec2_subs(re_vec2_t vec, f32_t scaler) { return re_vec2(vec.x - scaler, vec.y - scaler); }
+
+re_vec2_t re_vec2_rotate(re_vec2_t vec, f32_t degrees) {
+    f32_t theta = RAD(degrees);
+    return re_vec2(
+            vec.x * cosf(theta) - vec.y * sinf(theta),
+            vec.x * sinf(theta) + vec.y * cosf(theta)
+        );
+}
+
+re_vec2_t re_vec2_normalize(re_vec2_t vec) { return re_vec2_muls(vec, 1.0f / re_vec2_magnitude(vec)); }
+f32_t re_vec2_magnitude(re_vec2_t vec) { return sqrtf(vec.x*vec.x + vec.y*vec.y); }
+f32_t re_vec2_cross(re_vec2_t a, re_vec2_t b) { return a.x*b.y - a.y*b.x; }
+f32_t re_vec2_dot(re_vec2_t a, re_vec2_t b) { return a.x*b.x + a.y*b.y; }
+
+re_ivec2_t re_ivec2(i32_t x, i32_t y) { return (re_ivec2_t) {x, y}; }
+re_ivec2_t re_ivec2s(i32_t scaler) { return re_ivec2(scaler, scaler); }
+
+re_ivec2_t re_ivec2_mul(re_ivec2_t a, re_ivec2_t b) { return re_ivec2(a.x * b.x, a.y * b.y); }
+re_ivec2_t re_ivec2_div(re_ivec2_t a, re_ivec2_t b) { return re_ivec2(a.x / b.x, a.y / b.y); }
+re_ivec2_t re_ivec2_add(re_ivec2_t a, re_ivec2_t b) { return re_ivec2(a.x + b.x, a.y + b.y); }
+re_ivec2_t re_ivec2_sub(re_ivec2_t a, re_ivec2_t b) { return re_ivec2(a.x - b.x, a.y - b.y); }
+
+re_ivec2_t re_ivec2_muls(re_ivec2_t vec, i32_t scaler) { return re_ivec2(vec.x * scaler, vec.y * scaler); }
+re_ivec2_t re_ivec2_divs(re_ivec2_t vec, i32_t scaler) { return re_ivec2(vec.x / scaler, vec.y / scaler); }
+re_ivec2_t re_ivec2_adds(re_ivec2_t vec, i32_t scaler) { return re_ivec2(vec.x + scaler, vec.y + scaler); }
+re_ivec2_t re_ivec2_subs(re_ivec2_t vec, i32_t scaler) { return re_ivec2(vec.x - scaler, vec.y - scaler); }
+
+re_ivec2_t re_ivec2_rotate(re_ivec2_t vec, f32_t degrees) {
+    f32_t theta = RAD(degrees);
+    return re_ivec2(
+            vec.x * cosf(theta) - vec.y * sinf(theta),
+            vec.x * sinf(theta) + vec.y * cosf(theta)
+        );
+}
+
+re_ivec2_t re_ivec2_normalize(re_ivec2_t vec) { return re_ivec2_muls(vec, 1.0f / re_ivec2_magnitude(vec)); }
+i32_t re_ivec2_magnitude(re_ivec2_t vec) { return sqrtf(vec.x*vec.x + vec.y*vec.y); }
+i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b) { return a.x*b.y - a.y*b.x; }
+i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b) { return a.x*b.x + a.y*b.y; }
+
+re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t) {x, y, z}; }
+re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }
+
+re_mat4_t re_mat4_identity(void) {
+    return (re_mat4_t) {
+        {1, 0, 0, 0},
+        {0, 1, 0, 0},
+        {0, 0, 1, 0},
+        {0, 0, 0, 1}
+    };
+}
+
+re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top, f32_t bottom, f32_t near, f32_t far) {
+    // http://learnwebgl.brown37.net/08_projections/projections_ortho.html
+    f32_t mid_x = (left + right) / 2;
+    f32_t mid_y = (bottom + top) / 2;
+    f32_t mid_z = (-near + -far) / 2;
+
+    f32_t scale_x = 2.0f / (right - left);
+    f32_t scale_y = 2.0f / (top - bottom);
+    f32_t scale_z = 2.0f / (far - near);
+
+    return (re_mat4_t) {
+        {scale_x, 0,       0,       -mid_x},
+        {0,       scale_y, 0,       -mid_y},
+        {0,       0,      -scale_z, -mid_z},
+        {0,       0,       0,        1    },
+    };
 }
 
 //  ____  _       _    __                        _
@@ -517,3 +609,6 @@ void re_mutex_lock(re_mutex_t *mutex)   { pthread_mutex_lock(&mutex->handle); }
 void re_mutex_unlock(re_mutex_t *mutex) { pthread_mutex_unlock(&mutex->handle); }
 
 #endif // RE_OS_LINUX
+
+#ifdef RE_OS_WINDOWS
+#endif

@@ -25,7 +25,7 @@
 
 #ifdef _WIN32
 #define RE_OS_WINDOWS
-#error "Windows is currently not supported"
+/* #error "Windows is currently not supported" */
 #endif // _WIN32
 
 #ifdef __linux__
@@ -531,6 +531,84 @@ RE_API void _re_log(
         re_log_level_t level,
         const char *fmt,
         ...);
+
+/*=========================*/
+// Math
+/*=========================*/
+
+#define RAD(DEGS) (DEGS * 0.0174532925)
+#define DEG(RADS) (RADS * 57.2957795)
+
+typedef struct re_vec2_t re_vec2_t;
+struct re_vec2_t {
+    f32_t x, y;
+};
+
+RE_API re_vec2_t re_vec2(f32_t x, f32_t y);
+RE_API re_vec2_t re_vec2s(f32_t scaler);
+
+RE_API re_vec2_t re_vec2_mul(re_vec2_t a, re_vec2_t b);
+RE_API re_vec2_t re_vec2_div(re_vec2_t a, re_vec2_t b);
+RE_API re_vec2_t re_vec2_add(re_vec2_t a, re_vec2_t b);
+RE_API re_vec2_t re_vec2_sub(re_vec2_t a, re_vec2_t b);
+
+RE_API re_vec2_t re_vec2_muls(re_vec2_t vec, f32_t scaler);
+RE_API re_vec2_t re_vec2_divs(re_vec2_t vec, f32_t scaler);
+RE_API re_vec2_t re_vec2_adds(re_vec2_t vec, f32_t scaler);
+RE_API re_vec2_t re_vec2_subs(re_vec2_t vec, f32_t scaler);
+
+RE_API re_vec2_t re_vec2_rotate(re_vec2_t vec, f32_t degrees);
+
+RE_API re_vec2_t re_vec2_normalize(re_vec2_t vec);
+RE_API f32_t re_vec2_magnitude(re_vec2_t vec);
+RE_API f32_t re_vec2_cross(re_vec2_t a, re_vec2_t b);
+RE_API f32_t re_vec2_dot(re_vec2_t a, re_vec2_t b);
+
+typedef struct re_ivec2_t re_ivec2_t;
+struct re_ivec2_t {
+    i32_t x, y;
+};
+
+RE_API re_ivec2_t re_ivec2(i32_t x, i32_t y);
+RE_API re_ivec2_t re_ivec2s(i32_t scaler);
+
+RE_API re_ivec2_t re_ivec2_mul(re_ivec2_t a, re_ivec2_t b);
+RE_API re_ivec2_t re_ivec2_div(re_ivec2_t a, re_ivec2_t b);
+RE_API re_ivec2_t re_ivec2_add(re_ivec2_t a, re_ivec2_t b);
+RE_API re_ivec2_t re_ivec2_sub(re_ivec2_t a, re_ivec2_t b);
+
+RE_API re_ivec2_t re_ivec2_muls(re_ivec2_t vec, i32_t scaler);
+RE_API re_ivec2_t re_ivec2_divs(re_ivec2_t vec, i32_t scaler);
+RE_API re_ivec2_t re_ivec2_adds(re_ivec2_t vec, i32_t scaler);
+RE_API re_ivec2_t re_ivec2_subs(re_ivec2_t vec, i32_t scaler);
+
+RE_API re_ivec2_t re_ivec2_rotate(re_ivec2_t vec, f32_t degrees);
+
+RE_API re_ivec2_t re_ivec2_normalize(re_ivec2_t vec);
+RE_API i32_t re_ivec2_magnitude(re_ivec2_t vec);
+RE_API i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b);
+RE_API i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b);
+
+typedef struct re_ivec3_t re_ivec3_t;
+struct re_ivec3_t {
+    i32_t x, y, z;
+};
+
+RE_API re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z);
+RE_API re_ivec3_t re_ivec3s(i32_t scaler);
+
+typedef struct re_vec4_t re_vec4_t;
+struct re_vec4_t {
+    f32_t x, y, z, w;
+};
+
+typedef struct re_mat4_t re_mat4_t;
+struct re_mat4_t {
+    re_vec4_t i, j, k, l;
+};
+
+RE_API re_mat4_t re_mat4_identity(void);
+RE_API re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top, f32_t bottom, f32_t near, f32_t far);
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
