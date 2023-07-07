@@ -685,4 +685,12 @@ RE_API void        re_mutex_destroy(re_mutex_t *mutex);
 RE_API void        re_mutex_lock(re_mutex_t *mutex);
 RE_API void        re_mutex_unlock(re_mutex_t *mutex);
 
+/*=========================*/
+// System info
+/*=========================*/
+
+RE_API f32_t re_os_get_time(void);
+RE_API u32_t re_os_get_processor_count(void);
+RE_API u32_t re_os_get_page_size(void);
+
 #endif // REBOUND_H
