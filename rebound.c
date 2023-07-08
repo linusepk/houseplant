@@ -195,8 +195,8 @@ void _re_da_insert_fast(void **da, const void *value, usize_t index) {
     _re_da_header_t *head = _re_da_to_head(*da);
     index = re_clamp_max(index, head->count);
 
-    ptr_t dest = (ptr_t)*da + head->count * head->size;
-    ptr_t source = (ptr_t)*da + index * head->size;
+    ptr_t dest = (ptr_t) *da + head->count * head->size;
+    ptr_t source = (ptr_t) *da + index * head->size;
 
     memmove(dest, source, head->size);
     memcpy(source, value, head->size);
@@ -208,26 +208,25 @@ void _re_da_remove_fast(void **da, usize_t index, void *output) {
     _re_da_header_t *head = _re_da_to_head(*da);
     index = re_clamp_max(index, head->count - 1);
 
-    ptr_t dest = (ptr_t)*da + index * head->size;
-    ptr_t source = (ptr_t)*da + (head->count - 1) * head->size;
+    ptr_t dest = (ptr_t) *da + index * head->size;
+    ptr_t source = (ptr_t) *da + (head->count - 1) * head->size;
 
     if (output != NULL) {
-        memcpy(dest, output, head->size);
+        memcpy(output, dest, head->size);
     }
     memmove(dest, source, head->size);
 
     head->count--;
 }
 
-void _re_da_insert_arr(void **da, const void *arr, usize_t count,
-        usize_t index) {
+void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index) {
     _re_da_resize(da, count);
 
     _re_da_header_t *head = _re_da_to_head(*da);
     index = re_clamp_max(index, head->count);
 
-    ptr_t dest = (ptr_t)*da + (index + count) * head->size;
-    ptr_t source = (ptr_t)*da + index * head->size;
+    ptr_t dest = (ptr_t) *da + (index + count) * head->size;
+    ptr_t source = (ptr_t) *da + index * head->size;
 
     memmove(dest, source, (head->count - index) * head->size);
     if (arr == NULL) {
@@ -243,8 +242,8 @@ void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output) {
     _re_da_header_t *head = _re_da_to_head(*da);
     index = re_clamp_max(index, head->count - count);
 
-    ptr_t dest = (ptr_t)*da + index * head->size;
-    ptr_t source = (ptr_t)*da + (index + count) * head->size;
+    ptr_t dest = (ptr_t) *da + index * head->size;
+    ptr_t source = (ptr_t) *da + (index + count) * head->size;
 
     if (output != NULL) {
         memcpy(output, dest, count * head->size);
@@ -252,6 +251,10 @@ void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output) {
     memmove(dest, source, (head->count - index - count) * head->size);
 
     head->count -= count;
+}
+
+usize_t _re_da_count(void *da) {
+    return _re_da_to_head(da)->count;
 }
 
 /*=========================*/

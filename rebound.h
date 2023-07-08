@@ -253,27 +253,27 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
 // If key isn't present within the hash table it will be added.
 // If it is present it will instead be updated.
 #define re_ht_set(HT, KEY, VALUE) do { \
-    __typeof__(KEY) re_macro_var(temp_key) = KEY; \
+    (HT)->temp_key = KEY; \
     if ((HT)->count + 1 > (HT)->capacity * RE_HT_MAX_FILL) { \
         _re_ht_resize(HT); \
     } \
     __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size); \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&(HT)->temp_key, (HT)->key_size); \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
     if (!re_macro_var(entry)->alive) { \
         (HT)->count++; \
     } \
     re_macro_var(entry)->hash = re_macro_var(hash); \
-    re_macro_var(entry)->key = re_macro_var(temp_key); \
+    re_macro_var(entry)->key = (HT)->temp_key; \
     re_macro_var(entry)->value = (VALUE); \
     re_macro_var(entry)->alive = true; \
 } while (0)
 
 // If key is present within the hash table OUT will be set to the retrieved value, if not nothing will happen.
 #define re_ht_get(HT, KEY, OUT) do { \
-    __typeof__(KEY) re_macro_var(temp_key) = KEY; \
+    (HT)->temp_key = KEY; \
     __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size); \
+    usize_t re_macro_var(hash) = (HT)->hash_func(&(HT)->temp_key, (HT)->key_size); \
     _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
     if (re_macro_var(entry)->alive) {                                                         \
         (OUT) = re_macro_var(entry)->value; \
@@ -496,13 +496,13 @@ RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
 #define re_da_remove_arr(DA, COUNT, INDEX, OUT) _re_da_remove_arr((void **) &(DA), (COUNT), (INDEX), (OUT))
 
 // Pushes an entire array onto the back of the dynamic array.
-#define re_da_push_arr(DA, ARR, COUNT) _re_da_insert_arr((void **) &(DA), (ARR), (COUNT), re_da_count(DA));
+#define re_da_push_arr(DA, ARR, COUNT) _re_da_insert_arr((void **) &(DA), (ARR), (COUNT), re_da_count(DA))
 // Removes COUNT elements from the back of the dyanmic array.
 // If OUT is not NULL the removed values will be copied to it.
 #define re_da_pop_arr(DA, COUNT, OUT) _re_da_remove_arr((void **) &(DA), (COUNT), re_da_count(DA) - (COUNT), (OUT));
 
 // Retrieves the number of elements stored in the dynamic array.
-#define re_da_count(DA) _re_da_to_head(DA)->count
+#define re_da_count(DA) _re_da_count(DA)
 // Retrieves the last value in the dynamic array.
 #define re_da_last(DA) ((DA)[re_da_count(DA) - 1])
 // Makes an iterator to iterate over dyanmic array.
@@ -516,6 +516,7 @@ RE_API void _re_da_insert_fast(void **da, const void *value, usize_t index);
 RE_API void _re_da_remove_fast(void **da, usize_t index, void *output);
 RE_API void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index);
 RE_API void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output);
+RE_API usize_t _re_da_count(void *da);
 
 /*=========================*/
 // Logger
