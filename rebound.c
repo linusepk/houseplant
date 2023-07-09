@@ -534,6 +534,9 @@ f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b) {
 re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t){x, y, z}; }
 re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }
 
+re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {x, y, z, w}; }
+re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {scaler, scaler, scaler, scaler}; }
+
 re_mat4_t re_mat4_identity(void) {
     return (re_mat4_t){{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
 }

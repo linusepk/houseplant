@@ -701,6 +701,9 @@ struct re_vec4_t {
     f32_t x, y, z, w;
 };
 
+RE_API re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w);
+RE_API re_vec4_t re_vec4s(f32_t scaler);
+
 // 4x4 matrix.
 typedef struct re_mat4_t re_mat4_t;
 struct re_mat4_t {
