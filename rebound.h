@@ -662,6 +662,10 @@ RE_API f32_t re_ivec2_magnitude(re_ivec2_t vec);
 RE_API i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b);
 RE_API i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b);
 
+// Conversion.
+RE_API re_ivec2_t re_vec2_to_ivec2(re_vec2_t vec);
+RE_API re_vec2_t re_ivec2_to_vec2(re_ivec2_t vec);
+
 // 3D vector.
 typedef struct re_vec3_t re_vec3_t;
 struct re_vec3_t {

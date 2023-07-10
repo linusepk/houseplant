@@ -398,6 +398,7 @@ void re_logger_set_level(re_log_level_t level) { _re_logger.level = level; }
 // Math
 /*=========================*/
 
+// 2D vector.
 re_vec2_t re_vec2(f32_t x, f32_t y) { return (re_vec2_t){x, y}; }
 re_vec2_t re_vec2s(f32_t scaler) { return re_vec2(scaler, scaler); }
 
@@ -442,6 +443,7 @@ f32_t re_vec2_magnitude(re_vec2_t vec) {
 f32_t re_vec2_cross(re_vec2_t a, re_vec2_t b) { return a.x * b.y - a.y * b.x; }
 f32_t re_vec2_dot(re_vec2_t a, re_vec2_t b) { return a.x * b.x + a.y * b.y; }
 
+// 2D integer vector.
 re_ivec2_t re_ivec2(i32_t x, i32_t y) { return (re_ivec2_t){x, y}; }
 re_ivec2_t re_ivec2s(i32_t scaler) { return re_ivec2(scaler, scaler); }
 
@@ -488,6 +490,16 @@ i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b) {
 }
 i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b) { return a.x * b.x + a.y * b.y; }
 
+// Conversion.
+re_ivec2_t re_vec2_to_ivec2(re_vec2_t vec) {
+    return re_ivec2(vec.x, vec.y);
+}
+
+re_vec2_t re_ivec2_to_vec2(re_ivec2_t vec) {
+    return re_vec2(vec.x, vec.y);
+}
+
+// 3D vector.
 re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z) { return (re_vec3_t){x, y, z}; }
 re_vec3_t re_vec3s(f32_t scaler) { return re_vec3(scaler, scaler, scaler); }
 
@@ -531,12 +543,15 @@ f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+// 3D integer vector.
 re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t){x, y, z}; }
 re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }
 
+// 4D vector.
 re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {x, y, z, w}; }
 re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {scaler, scaler, scaler, scaler}; }
 
+// 4x4 matrix.
 re_mat4_t re_mat4_identity(void) {
     return (re_mat4_t){{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
 }
