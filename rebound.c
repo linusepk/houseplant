@@ -559,19 +559,15 @@ re_mat4_t re_mat4_identity(void) {
 re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top,
         f32_t bottom, f32_t near, f32_t far) {
     // http://learnwebgl.brown37.net/08_projections/projections_ortho.html
-    f32_t mid_x = (left + right) / 2.0f;
-    f32_t mid_y = (bottom + top) / 2.0f;
-    f32_t mid_z = (-near + -far) / 2.0f;
-
-    f32_t scale_x = 2.0f / (right - left);
-    f32_t scale_y = 2.0f / (top - bottom);
-    f32_t scale_z = 2.0f / (far - near);
+    f32_t rl =  1.0f / (right - left);
+    f32_t tb =  1.0f / (top   - bottom);
+    f32_t fn = -1.0f / (far   - near);
 
     return (re_mat4_t){
-        {scale_x, 0, 0, -mid_x},
-            {0, scale_y, 0, -mid_y},
-            {0, 0, -scale_z, -mid_z},
-            {0, 0, 0, 1},
+        {2.0f * rl, 0, 0, -(right+left) * rl},
+        {0, 2.0f * tb, 0, -(top+bottom) * tb},
+        {0, 0, -fn, near * fn},
+        {0, 0, 0, 1},
     };
 }
 
