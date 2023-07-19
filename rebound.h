@@ -719,6 +719,41 @@ RE_API re_mat4_t re_mat4_identity(void);
 // Calculates a 4x4 ortographic projection matrix.
 RE_API re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top, f32_t bottom, f32_t near, f32_t far);
 
+/*=========================*/
+// Pool.
+/*=========================*/
+
+typedef struct re_pool_t re_pool_t;
+struct re_pool_t {
+    void *pool;
+    u32_t count;
+    u32_t stride;
+    u32_t size;
+    u32_t capacity;
+};
+
+typedef struct re_pool_handle_t re_pool_handle_t;
+struct re_pool_handle_t {
+    const re_pool_t *pool;
+    u32_t handle;
+    u32_t generation;
+};
+#define RE_POOL_INVALID_HANDLE (re_pool_handle_t) {NULL, U32_MAX, U32_MAX};
+
+// Create a pool.
+RE_API re_pool_t *re_pool_create(u32_t capacity, u32_t object_size);
+// Destroy pool, freeing all memory used.
+RE_API void re_pool_destroy(re_pool_t **pool);
+
+// Retrieve a new handle.
+RE_API re_pool_handle_t re_pool_new(re_pool_t *pool);
+// Give handle back, making it invalid.
+RE_API void re_pool_delete(re_pool_handle_t handle);
+// Retrieve data from handle.
+RE_API void *re_pool_get_ptr(re_pool_handle_t handle);
+// Check if handle if still valid.
+RE_API b8_t re_pool_handle_valid(re_pool_handle_t handle);
+
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
 // | |_) | |/ _` | __| |_ / _ \| '__| '_ ` _ \  | |   / _` | | | |/ _ \ '__|

@@ -571,6 +571,97 @@ re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top,
     };
 }
 
+/*=========================*/
+// Pool
+/*=========================*/
+
+typedef struct _re_pool_entry_t _re_pool_entry_t;
+struct _re_pool_entry_t {
+    u32_t generation;
+    b8_t in_use;
+    // Return the address and not the actual value.
+    // It's only here for ease of use.
+    void *data;
+};
+#define _re_pool_get_entry(POOL, I) ((_re_pool_entry_t *) (ptr_t) (POOL)->pool + (POOL)->stride * (I))
+
+re_pool_t *re_pool_create(u32_t capacity, u32_t object_size) {
+    re_pool_t *pool = re_malloc(sizeof(re_pool_t));
+
+    u32_t stride = object_size + sizeof(u32_t) + sizeof(u8_t);
+    pool->pool = re_malloc(capacity * stride);
+    memset(pool->pool, 0, stride * capacity);
+    pool->count = 0;
+    pool->stride = stride;
+    pool->size = object_size;
+    pool->capacity = capacity;
+
+    return pool;
+}
+
+void re_pool_destroy(re_pool_t **pool) {
+    re_pool_t *_pool = *pool;
+    re_free(_pool->pool);
+
+    re_free(*pool);
+    *pool = NULL;
+}
+
+re_pool_handle_t re_pool_new(re_pool_t *pool) {
+    if (pool->count == pool->capacity) {
+        re_log_warn("Pool capacity reached.");
+        return RE_POOL_INVALID_HANDLE;
+    }
+
+    u32_t handle_index = 0;
+    _re_pool_entry_t *entry = NULL;
+    for (u32_t i = 0; i < pool->capacity; i++) {
+        entry = _re_pool_get_entry(pool, i);
+        if (!entry->in_use) {
+            handle_index = i;
+            break;
+        }
+    }
+
+    re_pool_handle_t handle = {
+        .pool = pool,
+        .handle = handle_index,
+        .generation = entry->generation
+    };
+    pool->count++;
+    entry->in_use = true;
+
+    return handle;
+}
+
+b8_t re_pool_handle_valid(re_pool_handle_t handle) {
+    if (handle.pool == NULL || (handle.handle == U32_MAX && handle.generation == U32_MAX)) {
+        return false;
+    }
+    _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
+    return handle.generation == entry->generation;
+}
+
+void re_pool_delete(re_pool_handle_t handle) {
+    if (!re_pool_handle_valid(handle)) {
+        re_log_warn("Double deleting handle.");
+        return;
+    }
+    _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
+    entry->in_use = false;
+    entry->generation++;
+}
+
+void *re_pool_get_ptr(re_pool_handle_t handle) {
+    if (!re_pool_handle_valid(handle)) {
+        re_log_warn("Using invalid handle.");
+        return NULL;
+    }
+
+    _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
+    return &entry->data;
+}
+
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __
 // | |_) | |/ _` | __| |_ / _ \| '__| '_ ` _ \  | |   / _` | | | |/ _ \ '__|
