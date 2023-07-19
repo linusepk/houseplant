@@ -720,7 +720,7 @@ RE_API re_mat4_t re_mat4_identity(void);
 RE_API re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top, f32_t bottom, f32_t near, f32_t far);
 
 /*=========================*/
-// Pool.
+// Pool
 /*=========================*/
 
 typedef struct re_pool_t re_pool_t;
@@ -753,6 +753,41 @@ RE_API void re_pool_delete(re_pool_handle_t handle);
 RE_API void *re_pool_get_ptr(re_pool_handle_t handle);
 // Check if handle if still valid.
 RE_API b8_t re_pool_handle_valid(re_pool_handle_t handle);
+
+/*=========================*/
+// Error handling
+/*=========================*/
+
+typedef enum {
+    RE_ERROR_LEVEL_FATAL,
+    RE_ERROR_LEVEL_ERROR,
+    RE_ERROR_LEVEL_WARN,
+    RE_ERROR_LEVEL_DEBUG = RE_LOG_LEVEL_DEBUG
+} re_error_level_t;
+
+typedef struct re_error_t re_error_t;
+struct re_error_t {
+    char message[256];
+    re_error_level_t level;
+    const char *file;
+    i32_t line;
+};
+
+typedef void (*re_error_callback_t)(re_error_t error);
+
+// Signals an error.
+#define re_error(level, ...) _re_error(level, __FILE__, __LINE__, __VA_ARGS__)
+// Retrieves the latest error off the stack.
+// There can be up to 16 errors on the stack at once.
+RE_API re_error_t re_error_pop(void);
+// Sets an error callback to be called every time an error is signaled.
+RE_API void re_error_set_callback(re_error_callback_t callback);
+// Sets the minimum error level that will be sent to the stack and callback.
+RE_API void re_error_set_level(re_error_level_t level);
+// Premade callback that logs all errors.
+RE_API void re_error_log_callback(re_error_t error);
+
+RE_API void _re_error(re_error_level_t level, const char *file, i32_t line, const char *fmt, ...) RE_FORMAT_FUNCTION(4, 5);
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __

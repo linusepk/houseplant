@@ -609,7 +609,7 @@ void re_pool_destroy(re_pool_t **pool) {
 
 re_pool_handle_t re_pool_new(re_pool_t *pool) {
     if (pool->count == pool->capacity) {
-        re_log_warn("Pool capacity reached.");
+        re_error(RE_ERROR_LEVEL_WARN, "Pool capacity reached.");
         return RE_POOL_INVALID_HANDLE;
     }
 
@@ -644,7 +644,7 @@ b8_t re_pool_handle_valid(re_pool_handle_t handle) {
 
 void re_pool_delete(re_pool_handle_t handle) {
     if (!re_pool_handle_valid(handle)) {
-        re_log_warn("Double deleting handle.");
+        re_error(RE_ERROR_LEVEL_WARN, "Double deleting handle.");
         return;
     }
     _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
@@ -654,12 +654,68 @@ void re_pool_delete(re_pool_handle_t handle) {
 
 void *re_pool_get_ptr(re_pool_handle_t handle) {
     if (!re_pool_handle_valid(handle)) {
-        re_log_warn("Using invalid handle.");
+        re_error(RE_ERROR_LEVEL_WARN, "Using invalid handle.");
         return NULL;
     }
 
     _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
     return &entry->data;
+}
+
+/*=========================*/
+// Error handling
+/*=========================*/
+
+#define RE_ERROR_STACK_SIZE 16
+
+static re_error_t _re_error_stack[RE_ERROR_STACK_SIZE] = {0};
+static u32_t _re_error_stack_count = 0;
+static re_error_callback_t _re_error_callback = NULL;
+static re_error_level_t _re_error_level = RE_ERROR_LEVEL_WARN;
+
+re_error_t re_error_pop(void) {
+    re_error_t error = _re_error_stack[0];
+
+    _re_error_stack[_re_error_stack_count] = (re_error_t) {0};
+    memmove(&_re_error_stack[0], &_re_error_stack[1], sizeof(_re_error_stack) - sizeof(re_error_t));
+    if (_re_error_stack_count > RE_ERROR_STACK_SIZE) {
+        _re_error_stack_count--;
+    }
+
+    return error;
+}
+
+void _re_error(re_error_level_t level, const char *file, i32_t line, const char *fmt, ...) {
+    if (level > _re_error_level) {
+        return;
+    }
+
+    re_error_t error = {
+        .message = {0},
+        .level = level,
+        .file = file,
+        .line = line
+    };
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(error.message, sizeof(error.message), fmt, args);
+    va_end(args);
+
+    memmove(&_re_error_stack[1], &_re_error_stack[0], sizeof(_re_error_stack) - sizeof(re_error_t));
+    if (_re_error_stack_count < RE_ERROR_STACK_SIZE) {
+        _re_error_stack_count++;
+    }
+    _re_error_stack[0] = error;
+
+    if (_re_error_callback != NULL) {
+        _re_error_callback(error);
+    }
+}
+
+void re_error_set_callback(re_error_callback_t callback) { _re_error_callback = callback; }
+void re_error_set_level(re_error_level_t level) { _re_error_level = level; }
+void re_error_log_callback(re_error_t error) {
+    _re_log(error.file, error.line, (re_log_level_t) error.level, "%s", error.message);
 }
 
 //  ____  _       _    __                        _
