@@ -636,6 +636,8 @@ RE_API f32_t re_vec2_magnitude(re_vec2_t vec);
 RE_API f32_t re_vec2_cross(re_vec2_t a, re_vec2_t b);
 RE_API f32_t re_vec2_dot(re_vec2_t a, re_vec2_t b);
 
+RE_API b8_t re_vec2_equal(re_vec2_t a, re_vec2_t b);
+
 // 2D integer vector.
 typedef struct re_ivec2_t re_ivec2_t;
 struct re_ivec2_t {
@@ -661,6 +663,8 @@ RE_API re_ivec2_t re_ivec2_normalize(re_ivec2_t vec);
 RE_API f32_t re_ivec2_magnitude(re_ivec2_t vec);
 RE_API i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b);
 RE_API i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b);
+
+RE_API b8_t re_ivec2_equal(re_ivec2_t a, re_ivec2_t b);
 
 // Conversion.
 RE_API re_ivec2_t re_vec2_to_ivec2(re_vec2_t vec);
@@ -690,6 +694,8 @@ RE_API f32_t re_vec3_magnitude(re_vec3_t vec);
 RE_API re_vec3_t re_vec3_cross(re_vec3_t a, re_vec3_t b);
 RE_API f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b);
 
+RE_API b8_t re_vec3_equal(re_vec3_t a, re_vec3_t b);
+
 // 3D integer vector.
 typedef struct re_ivec3_t re_ivec3_t;
 struct re_ivec3_t {
@@ -699,6 +705,8 @@ struct re_ivec3_t {
 RE_API re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z);
 RE_API re_ivec3_t re_ivec3s(i32_t scaler);
 
+RE_API b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b);
+
 // 4D vector.
 typedef struct re_vec4_t re_vec4_t;
 struct re_vec4_t {
@@ -707,6 +715,8 @@ struct re_vec4_t {
 
 RE_API re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w);
 RE_API re_vec4_t re_vec4s(f32_t scaler);
+
+RE_API b8_t re_vec4_equal(re_vec4_t a, re_vec4_t b);
 
 // 4x4 matrix.
 typedef struct re_mat4_t re_mat4_t;

@@ -443,6 +443,10 @@ f32_t re_vec2_magnitude(re_vec2_t vec) {
 f32_t re_vec2_cross(re_vec2_t a, re_vec2_t b) { return a.x * b.y - a.y * b.x; }
 f32_t re_vec2_dot(re_vec2_t a, re_vec2_t b) { return a.x * b.x + a.y * b.y; }
 
+b8_t re_vec2_equal(re_vec2_t a, re_vec2_t b) {
+    return a.x == b.x && a.y == b.y;
+}
+
 // 2D integer vector.
 re_ivec2_t re_ivec2(i32_t x, i32_t y) { return (re_ivec2_t){x, y}; }
 re_ivec2_t re_ivec2s(i32_t scaler) { return re_ivec2(scaler, scaler); }
@@ -489,6 +493,10 @@ i32_t re_ivec2_cross(re_ivec2_t a, re_ivec2_t b) {
     return a.x * b.y - a.y * b.x;
 }
 i32_t re_ivec2_dot(re_ivec2_t a, re_ivec2_t b) { return a.x * b.x + a.y * b.y; }
+
+b8_t re_ivec2_equal(re_ivec2_t a, re_ivec2_t b) {
+    return a.x == b.x && a.y == b.y;
+}
 
 // Conversion.
 re_ivec2_t re_vec2_to_ivec2(re_vec2_t vec) {
@@ -543,13 +551,26 @@ f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b) {
     return a.x * b.x + a.y * b.y + a.z * b.z;
 }
 
+b8_t re_vec3_equal(re_vec3_t a, re_vec3_t b) {
+    return a.x == b.x && a.y == b.y && a.z == b.y;
+}
+
+
 // 3D integer vector.
 re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t){x, y, z}; }
 re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }
 
+b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b) {
+    return a.x == b.x && a.y == b.y && a.z == b.y;
+}
+
 // 4D vector.
 re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {x, y, z, w}; }
 re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {scaler, scaler, scaler, scaler}; }
+
+b8_t re_vec4_equal(re_vec4_t a, re_vec4_t b) {
+    return a.x == b.x && a.y == b.y && a.z == b.y && a.w == b.w;
+}
 
 // 4x4 matrix.
 re_mat4_t re_mat4_identity(void) {
@@ -734,7 +755,6 @@ void re_error_log_callback(re_error_t error) {
 
 struct re_lib_t {
     void *handle;
-    b8_t valid;
 };
 
 struct re_mutex_t {
@@ -749,27 +769,25 @@ re_lib_t *re_lib_load(const char *path) {
     re_lib_t *lib = re_malloc(sizeof(re_lib_t));
     *lib = (re_lib_t){0};
     lib->handle = dlopen(path, RTLD_LAZY);
-    if (lib->handle != NULL) {
-        lib->valid = true;
+    if (lib->handle == NULL) {
+        re_free(lib);
+        return NULL;
     }
     return lib;
 }
 
 void re_lib_unload(re_lib_t *lib) {
-    if (!lib->valid) {
+    if (lib == NULL) {
         return;
     }
 
     dlclose(lib->handle);
     lib->handle = NULL;
-    lib->valid = false;
     re_free(lib);
 }
 
 re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name) {
-    if (!lib->valid) {
-        return NULL;
-    }
+    RE_ASSERT(lib != NULL, "Loading function '%s' from NULL library.", name);
 
     re_func_ptr_t ptr;
     *((void **)&ptr) = dlsym(lib->handle, name);
