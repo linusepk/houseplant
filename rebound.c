@@ -596,6 +596,14 @@ re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top,
 // Pool
 /*=========================*/
 
+struct re_pool_t {
+    void *pool;
+    u32_t count;
+    u32_t stride;
+    u32_t size;
+    u32_t capacity;
+};
+
 typedef struct _re_pool_entry_t _re_pool_entry_t;
 struct _re_pool_entry_t {
     u32_t generation;

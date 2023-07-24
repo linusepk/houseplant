@@ -734,13 +734,6 @@ RE_API re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t 
 /*=========================*/
 
 typedef struct re_pool_t re_pool_t;
-struct re_pool_t {
-    void *pool;
-    u32_t count;
-    u32_t stride;
-    u32_t size;
-    u32_t capacity;
-};
 
 typedef struct re_pool_handle_t re_pool_handle_t;
 struct re_pool_handle_t {
