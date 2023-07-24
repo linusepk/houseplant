@@ -765,10 +765,20 @@ struct re_mutex_t {
 // Dynamic library loading
 /*=========================*/
 
-re_lib_t *re_lib_load(const char *path) {
+re_lib_t *re_lib_load(const char *path, re_lib_mode_t mode) {
+    u32_t posix_mode = 0;
+    switch (mode) {
+        case RE_LIB_MODE_LOCAL:
+            posix_mode = RTLD_LOCAL;
+            break;
+        case RE_LIB_MODE_GLOBAL:
+            posix_mode = RTLD_GLOBAL;
+            break;
+    }
+
     re_lib_t *lib = re_malloc(sizeof(re_lib_t));
     *lib = (re_lib_t){0};
-    lib->handle = dlopen(path, RTLD_LAZY);
+    lib->handle = dlopen(path, RTLD_LAZY | posix_mode);
     if (lib->handle == NULL) {
         re_free(lib);
         return NULL;

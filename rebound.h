@@ -811,13 +811,18 @@ RE_API void _re_error(re_error_level_t level, const char *file, i32_t line, cons
 // Dynamic library loading
 /*=========================*/
 
+typedef enum {
+    RE_LIB_MODE_GLOBAL,
+    RE_LIB_MODE_LOCAL
+} re_lib_mode_t;
+
 typedef struct re_lib_t re_lib_t;
 
 typedef void (*re_func_ptr_t)(void);
 
 // Loads a dynamic library.
 // Returns NULL if it fails.
-RE_API re_lib_t *re_lib_load(const char *filepath);
+RE_API re_lib_t *re_lib_load(const char *filepath, re_lib_mode_t mode);
 // Unloads a dynamic library.
 RE_API void re_lib_unload(re_lib_t *lib);
 // Retrieves a function using 'name' from dynamic library.
