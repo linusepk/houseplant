@@ -737,7 +737,7 @@ typedef struct re_pool_t re_pool_t;
 
 typedef struct re_pool_handle_t re_pool_handle_t;
 struct re_pool_handle_t {
-    re_pool_t *const pool;
+    re_pool_t *pool;
     u32_t handle;
     u32_t generation;
 };
