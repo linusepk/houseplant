@@ -15,5 +15,15 @@ void test_pool(void) {
     RE_ENSURE(!re_pool_handle_valid(handle), "re_pool_delete failed");
     re_log_info("re_pool_delete passed.");
 
+    for (u32_t i = 0; i < 8; i++) {
+        re_pool_new(pool);
+    }
+    u32_t count = 0;
+    for (re_pool_iter_t iter = re_pool_iter_new(pool); re_pool_iter_valid(iter); re_pool_iter_next(&iter)) {
+        count++;
+    }
+    RE_ENSURE(count == 8, "re_pool_iter failed");
+    re_log_info("re_pool_iter passed");
+
     re_pool_destroy(&pool);
 }

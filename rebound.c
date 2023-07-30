@@ -612,7 +612,7 @@ struct _re_pool_entry_t {
     // It's only here for ease of use.
     void *data;
 };
-#define _re_pool_get_entry(POOL, I) ((_re_pool_entry_t *) (ptr_t) (POOL)->pool + (POOL)->stride * (I))
+#define _re_pool_get_entry(POOL, I) ((_re_pool_entry_t *) ((ptr_t) (POOL)->pool + (POOL)->stride * (I)))
 
 re_pool_t *re_pool_create(u32_t capacity, u32_t object_size) {
     re_pool_t *pool = re_malloc(sizeof(re_pool_t));
@@ -679,6 +679,7 @@ void re_pool_delete(re_pool_handle_t handle) {
     _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
     entry->in_use = false;
     entry->generation++;
+    ((re_pool_t *) handle.pool)->count--;
 }
 
 void *re_pool_get_ptr(re_pool_handle_t handle) {
@@ -689,6 +690,58 @@ void *re_pool_get_ptr(re_pool_handle_t handle) {
 
     _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
     return &entry->data;
+}
+
+re_pool_iter_t re_pool_iter_new(re_pool_t *pool) {
+    re_pool_iter_t iter = {
+        .pool = pool
+    };
+    for (; iter.index < pool->capacity; iter.index++) {
+        _re_pool_entry_t *entry = _re_pool_get_entry(pool, iter.index);
+        if (entry->in_use) {
+            return iter;
+        }
+    }
+
+    return (re_pool_iter_t) {
+        .pool = NULL,
+        .index = U32_MAX
+    };
+}
+
+b8_t re_pool_iter_valid(re_pool_iter_t iter) {
+    return iter.pool != NULL && iter.index < iter.pool->capacity;
+}
+
+void re_pool_iter_next(re_pool_iter_t *iter) {
+    if (!re_pool_iter_valid(*iter)) {
+        return;
+    }
+
+    iter->index++;
+    for (; iter->index < iter->pool->capacity; iter->index++) {
+        _re_pool_entry_t *entry = _re_pool_get_entry(iter->pool, iter->index);
+        if (entry->in_use) {
+            return;
+        }
+    }
+
+    iter->pool = NULL;
+    iter->index = U32_MAX;
+}
+
+re_pool_handle_t re_pool_iter_get(re_pool_iter_t iter) {
+    if (!re_pool_iter_valid(iter)) {
+        return RE_POOL_INVALID_HANDLE;
+    }
+
+    _re_pool_entry_t *entry = _re_pool_get_entry(iter.pool, iter.index);
+    re_pool_handle_t handle = {
+        .pool = iter.pool,
+        .handle = iter.index,
+        .generation = entry->generation
+    };
+    return handle;
 }
 
 /*=========================*/

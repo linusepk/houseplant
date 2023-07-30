@@ -737,7 +737,7 @@ typedef struct re_pool_t re_pool_t;
 
 typedef struct re_pool_handle_t re_pool_handle_t;
 struct re_pool_handle_t {
-    const re_pool_t *pool;
+    re_pool_t *const pool;
     u32_t handle;
     u32_t generation;
 };
@@ -756,6 +756,17 @@ RE_API void re_pool_delete(re_pool_handle_t handle);
 RE_API void *re_pool_get_ptr(re_pool_handle_t handle);
 // Check if handle if still valid.
 RE_API b8_t re_pool_handle_valid(re_pool_handle_t handle);
+
+typedef struct re_pool_iter_t re_pool_iter_t;
+struct re_pool_iter_t {
+    re_pool_t *pool;
+    u32_t index;
+};
+
+RE_API re_pool_iter_t re_pool_iter_new(re_pool_t *pool);
+RE_API b8_t re_pool_iter_valid(re_pool_iter_t iter);
+RE_API void re_pool_iter_next(re_pool_iter_t *iter);
+RE_API re_pool_handle_t re_pool_iter_get(re_pool_iter_t iter);
 
 /*=========================*/
 // Error handling
