@@ -120,6 +120,33 @@ RE_API void *re_realloc(void *ptr, usize_t size);
 RE_API void  re_free(void *ptr);
 
 /*=========================*/
+// Arena
+/*=========================*/
+
+typedef struct re_arena_t re_arena_t;
+
+RE_API re_arena_t *re_arena_create(u32_t capacity);
+RE_API void re_arena_destroy(re_arena_t **arena);
+
+RE_API void *re_arena_push(re_arena_t *arena, u32_t size);
+RE_API void *re_arena_push_zero(re_arena_t *arena, u32_t size);
+
+RE_API void re_arena_pop(re_arena_t *arena, u32_t size);
+RE_API void re_arena_clear(re_arena_t *arena);
+
+RE_API u32_t re_arena_get_pos(re_arena_t *arena);
+RE_API void *re_arena_get_index(u32_t index, re_arena_t *arena);
+
+typedef struct re_arena_temp_t re_arena_temp_t;
+struct re_arena_temp_t {
+    re_arena_t *arena;
+    u32_t position;
+};
+
+RE_API re_arena_temp_t re_arena_temp_start(re_arena_t *arena);
+RE_API void re_arena_temp_end(re_arena_temp_t *arena);
+
+/*=========================*/
 // Utils
 /*=========================*/
 

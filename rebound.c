@@ -63,6 +63,90 @@ void *re_realloc(void *ptr, usize_t size) {
 void re_free(void *ptr) { RE_FREE(ptr); }
 
 /*=========================*/
+// Arena
+/*=========================*/
+
+struct re_arena_t {
+    u32_t capacity;
+    u32_t position;
+    u32_t commited;
+    ptr_t pool;
+};
+
+re_arena_t *re_arena_create(u32_t capacity) {
+    u32_t actual_capacity = ((sizeof(re_arena_t) + capacity) + re_os_get_page_size() - 1) & (~re_os_get_page_size() - 1);
+    re_arena_t *arena = re_os_mem_reserve(actual_capacity);
+    re_os_mem_commit(arena, re_os_get_page_size());
+
+    arena->capacity = actual_capacity;
+    arena->position = 0;
+    arena->commited = re_os_get_page_size();
+    arena->pool = (ptr_t) arena + sizeof(re_arena_t);
+
+    return arena;
+}
+
+void re_arena_destroy(re_arena_t **arena) {
+    re_os_mem_release(*arena, (*arena)->capacity);
+    *arena = NULL;
+}
+
+void *re_arena_push(re_arena_t *arena, u32_t size) {
+    if (arena->position + size > arena->commited) {
+        re_os_mem_commit((ptr_t) arena + arena->commited, re_os_get_page_size());
+        arena->commited += re_os_get_page_size();
+    }
+
+    void *result = arena->pool + arena->position;
+    arena->position += size;
+    return result;
+}
+
+void *re_arena_push_zero(re_arena_t *arena, u32_t size) {
+    void *result = re_arena_push(arena, size);
+
+    ptr_t iter = result;
+    for (u32_t i = 0; i < size; i++) {
+        iter[i] = 0;
+    }
+
+    return result;
+}
+
+void re_arena_pop(re_arena_t *arena, u32_t size) {
+    if (arena->position <= arena->commited - re_os_get_page_size()) {
+        arena->commited -= re_os_get_page_size();
+        re_os_mem_decommit((ptr_t) arena + arena->commited, re_os_get_page_size());
+    }
+    arena->position -= size;
+}
+
+void re_arena_clear(re_arena_t *arena) {
+    re_os_mem_decommit((ptr_t) arena + re_os_get_page_size(), arena->commited - re_os_get_page_size());
+    arena->commited = re_os_get_page_size();
+    arena->position = 0;
+}
+
+u32_t re_arena_get_pos(re_arena_t *arena) {
+    return arena->position;
+}
+
+void *re_arena_get_index(u32_t index, re_arena_t *arena) {
+    return arena->pool + index;
+}
+
+re_arena_temp_t re_arena_temp_start(re_arena_t *arena) {
+    return (re_arena_temp_t) {
+        .arena = arena,
+        .position = arena->position
+    };
+}
+
+void re_arena_temp_end(re_arena_temp_t *arena) {
+    arena->arena->position = arena->position;
+}
+
+/*=========================*/
 // Utils
 /*=========================*/
 
