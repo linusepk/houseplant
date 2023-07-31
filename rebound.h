@@ -401,14 +401,14 @@ RE_API re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries, usize_t entr
 
 typedef struct re_str_t re_str_t;
 struct re_str_t {
+    u8_t *str;
     usize_t len;
-    char *str;
 };
 
-#define re_str_null { 0, NULL }
-#define re_str_lit(str) re_str(str, sizeof(str) - 1)
-#define re_str_cstr(str) re_str(str, strlen(str))
-RE_API re_str_t re_str(const char *cstr, usize_t len);
+#define re_str_null ((re_str_t) {NULL, 0})
+#define re_str_lit(str) re_str((u8_t *) (str), sizeof(str) - 1)
+#define re_str_cstr(str) re_str((u8_t *) (str), strlen(str))
+RE_API re_str_t re_str(u8_t *cstr, usize_t len);
 RE_API re_str_t re_str_sub(re_str_t string, usize_t start, usize_t end);
 RE_API re_str_t re_str_prefix(re_str_t string, usize_t len);
 RE_API re_str_t re_str_suffix(re_str_t string, usize_t len);
@@ -834,6 +834,12 @@ RE_API void re_error_set_level(re_error_level_t level);
 RE_API void re_error_log_callback(re_error_t error);
 
 RE_API void _re_error(re_error_level_t level, const char *file, i32_t line, const char *fmt, ...) RE_FORMAT_FUNCTION(4, 5);
+
+/*=========================*/
+// File handling
+/*=========================*/
+
+RE_API re_str_t re_file_read(const char *filepath, re_arena_t *arena);
 
 //  ____  _       _    __                        _
 // |  _ \| | __ _| |_ / _| ___  _ __ _ __ ___   | |    __ _ _   _  ___ _ __

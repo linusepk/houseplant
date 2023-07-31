@@ -189,32 +189,32 @@ re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries,
 // Strings
 /*=========================*/
 
-re_str_t re_str(const char *cstr, usize_t len) { return (re_str_t){len, cstr}; }
+re_str_t re_str(u8_t *cstr, usize_t len) { return (re_str_t) {cstr, len}; }
 
 re_str_t re_str_sub(re_str_t string, usize_t start, usize_t end) {
     usize_t len = end - start + 1;
     len = re_clamp_max(len, string.len);
-    return (re_str_t){len, &string.str[start]};
+    return (re_str_t) {&string.str[start], len};
 }
 
 re_str_t re_str_prefix(re_str_t string, usize_t len) {
     usize_t clamped_len = re_clamp_max(len, string.len);
-    return (re_str_t){clamped_len, string.str};
+    return (re_str_t) {string.str, clamped_len};
 }
 
 re_str_t re_str_suffix(re_str_t string, usize_t len) {
     usize_t clamped_len = re_clamp_max(len, string.len);
-    return (re_str_t){clamped_len, &string.str[string.len - clamped_len]};
+    return (re_str_t) {&string.str[string.len - clamped_len], clamped_len};
 }
 
 re_str_t re_str_chop(re_str_t string, usize_t len) {
     usize_t clamped_len = re_clamp_max(len, string.len);
-    return (re_str_t){string.len - clamped_len, string.str};
+    return (re_str_t){string.str, string.len - clamped_len};
 }
 
 re_str_t re_str_skip(re_str_t string, usize_t len) {
     usize_t clamped_len = re_clamp_max(string.len - len, string.len);
-    return (re_str_t){clamped_len, string.str + len};
+    return (re_str_t){string.str + len, clamped_len};
 }
 
 i32_t re_str_cmp(re_str_t a, re_str_t b) {
@@ -879,6 +879,25 @@ void re_error_set_callback(re_error_callback_t callback) { _re_error_callback = 
 void re_error_set_level(re_error_level_t level) { _re_error_level = level; }
 void re_error_log_callback(re_error_t error) {
     _re_log(error.file, error.line, (re_log_level_t) error.level, "%s", error.message);
+}
+
+/*=========================*/
+// File handling
+/*=========================*/
+
+re_str_t re_file_read(const char *filepath, re_arena_t *arena) {
+    FILE *fp = fopen(filepath, "rb");
+    if (!fp) {
+        return re_str_null;
+    }
+
+    fseek(fp, 0, SEEK_END);
+    u32_t len = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    u8_t *buffer = re_arena_push(arena, len);
+    fread(buffer, 1, len, fp);
+    return re_str(buffer, len);
 }
 
 //  ____  _       _    __                        _
