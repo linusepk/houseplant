@@ -24,6 +24,27 @@
 // Base layer
 
 /*=========================*/
+// Global state
+/*=========================*/
+
+/* typedef struct _rebound_state_t _rebound_state_t; */
+/* struct _rebound_state_t { */
+/* }; */
+/* static _rebound_state_t _re_state = {0}; */
+
+/*=========================*/
+// Initialization
+/*=========================*/
+
+void re_init(void) {
+    re_os_init();
+}
+
+void re_terminate(void) {
+    re_os_terminate();
+}
+
+/*=========================*/
 // Allocators
 /*=========================*/
 
@@ -811,6 +832,31 @@ void re_error_log_callback(re_error_t error) {
 #ifdef RE_OS_LINUX
 
 /*=========================*/
+// Initialization
+/*=========================*/
+
+typedef struct _re_os_state_t _re_os_state_t;
+struct _re_os_state_t {
+    f32_t start_time;
+    u32_t processor_count;
+    u32_t page_size;
+};
+
+static _re_os_state_t _re_os_state = {0};
+
+void re_os_init(void) {
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    _re_os_state.start_time = (f32_t)tp.tv_sec + (f32_t)tp.tv_nsec * 1e-9;
+
+    _re_os_state.processor_count = sysconf(_SC_NPROCESSORS_ONLN);
+    _re_os_state.page_size = getpagesize();
+}
+
+void re_os_terminate(void) {
+}
+
+/*=========================*/
 // Platform specific structs
 /*=========================*/
 
@@ -885,7 +931,7 @@ void re_thread_wait(re_thread_t thread) { pthread_join(thread.handle, NULL); }
 // Mutexes
 re_mutex_t *re_mutex_create(void) {
     re_mutex_t *mutex = re_malloc(sizeof(re_mutex_t));
-    mutex->handle = (pthread_mutex_t)PTHREAD_MUTEX_INITIALIZER;
+    mutex->handle = (pthread_mutex_t) PTHREAD_MUTEX_INITIALIZER;
     return mutex;
 }
 
@@ -903,54 +949,38 @@ void re_mutex_unlock(re_mutex_t *mutex) {
 // System info
 /*=========================*/
 
-typedef struct _re_system_info _system_info;
-struct _re_system_info {
-    b8_t initialized;
-    b8_t initialized_time;
-    f32_t start_time;
-    u32_t processor_count;
-    u32_t page_size;
-};
-static _system_info _re_sys_info = {
-    .start_time = -1.0f
-};
-
-static void _re_init_sys_info(b8_t init_time) {
-    _re_sys_info.initialized = true;
-    if (init_time) {
-        struct timespec tp;
-        clock_gettime(CLOCK_MONOTONIC, &tp);
-        _re_sys_info.start_time = (f32_t)tp.tv_sec + (f32_t)tp.tv_nsec * 1e-9;
-    }
-
-    _re_sys_info.processor_count = sysconf(_SC_NPROCESSORS_ONLN);
-    _re_sys_info.page_size = getpagesize();
-}
-
 f32_t re_os_get_time(void) {
-    if (_re_sys_info.start_time == -1.0f) {
-        _re_init_sys_info(true);
-    }
-
     struct timespec tp;
     clock_gettime(CLOCK_MONOTONIC, &tp);
-    return ((f32_t)tp.tv_sec + (f32_t)tp.tv_nsec * 1e-9) - _re_sys_info.start_time;
+    return ((f32_t)tp.tv_sec + (f32_t)tp.tv_nsec * 1e-9) - _re_os_state.start_time;
 }
 
 u32_t re_os_get_processor_count(void) {
-    if (!_re_sys_info.initialized) {
-        _re_init_sys_info(false);
-    }
-
-    return _re_sys_info.processor_count;
+    return _re_os_state.processor_count;
 }
 
 u32_t re_os_get_page_size(void) {
-    if (!_re_sys_info.initialized) {
-        _re_init_sys_info(false);
-    }
+    return _re_os_state.page_size;
+}
 
-    return _re_sys_info.page_size;
+/*=========================*/
+// Memory
+/*=========================*/
+
+void *re_os_mem_reserve(usize_t size) {
+    return mmap(NULL, size, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0);
+}
+
+void re_os_mem_commit(void *ptr, usize_t size) {
+    mprotect(ptr, size, PROT_READ | PROT_WRITE);
+}
+
+void re_os_mem_decommit(void *ptr, usize_t size) {
+    mprotect(ptr, size, PROT_NONE);
+}
+
+void re_os_mem_release(void *ptr, usize_t size) {
+    munmap(ptr, size);
 }
 
 #endif // RE_OS_LINUX

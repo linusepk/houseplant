@@ -90,6 +90,13 @@ typedef u8_t *ptr_t;
 #endif // NULL
 
 /*=========================*/
+// Initialization
+/*=========================*/
+
+RE_API void re_init(void);
+RE_API void re_terminate(void);
+
+/*=========================*/
 // Allocators
 /*=========================*/
 
@@ -368,7 +375,7 @@ RE_API re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries, usize_t entr
 typedef struct re_str_t re_str_t;
 struct re_str_t {
     usize_t len;
-    const char *str;
+    char *str;
 };
 
 #define re_str_null { 0, NULL }
@@ -812,6 +819,13 @@ RE_API void _re_error(re_error_level_t level, const char *file, i32_t line, cons
 // Platform layer
 
 /*=========================*/
+// Initialization
+/*=========================*/
+
+RE_API void re_os_init(void);
+RE_API void re_os_terminate(void);
+
+/*=========================*/
 // Dynamic library loading
 /*=========================*/
 
@@ -873,5 +887,14 @@ RE_API f32_t re_os_get_time(void);
 RE_API u32_t re_os_get_processor_count(void);
 // Gets size of a memory page.
 RE_API u32_t re_os_get_page_size(void);
+
+/*=========================*/
+// Memory
+/*=========================*/
+
+RE_API void *re_os_mem_reserve(usize_t size);
+RE_API void re_os_mem_commit(void *ptr, usize_t size);
+RE_API void re_os_mem_decommit(void *ptr, usize_t size);
+RE_API void re_os_mem_release(void *ptr, usize_t size);
 
 #endif // REBOUND_H
