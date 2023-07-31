@@ -701,138 +701,115 @@ re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top,
 // Pool
 /*=========================*/
 
-struct re_pool_t {
-    void *pool;
-    u32_t count;
-    u32_t stride;
-    u32_t size;
-    u32_t capacity;
-};
-
-typedef struct _re_pool_entry_t _re_pool_entry_t;
-struct _re_pool_entry_t {
+typedef struct _re_pool_node_t _re_pool_node_t;
+struct _re_pool_node_t {
+    _re_pool_node_t *next;
+    _re_pool_node_t *prev;
+    u32_t index;
     u32_t generation;
-    b8_t in_use;
-    // Return the address and not the actual value.
-    // It's only here for ease of use.
-    void *data;
 };
-#define _re_pool_get_entry(POOL, I) ((_re_pool_entry_t *) ((ptr_t) (POOL)->pool + (POOL)->stride * (I)))
 
-re_pool_t *re_pool_create(u32_t capacity, u32_t object_size) {
-    re_pool_t *pool = re_malloc(sizeof(re_pool_t));
+struct re_pool_t {
+    re_arena_t *arena;
+    u32_t size;
+    _re_pool_node_t *free_node;
+    _re_pool_node_t *used_nodes;
+};
 
-    u32_t stride = object_size + sizeof(u32_t) + sizeof(u8_t);
-    pool->pool = re_malloc(capacity * stride);
-    memset(pool->pool, 0, stride * capacity);
-    pool->count = 0;
-    pool->stride = stride;
+re_pool_t *re_pool_create(u32_t object_size, re_arena_t *arena) {
+    re_pool_t *pool = re_arena_push(arena, sizeof(re_pool_t));
+
+    pool->arena = arena;
     pool->size = object_size;
-    pool->capacity = capacity;
+    pool->free_node = NULL;
+    pool->used_nodes = NULL;
 
     return pool;
 }
 
-void re_pool_destroy(re_pool_t **pool) {
-    re_pool_t *_pool = *pool;
-    re_free(_pool->pool);
-
-    re_free(*pool);
-    *pool = NULL;
-}
-
 re_pool_handle_t re_pool_new(re_pool_t *pool) {
-    if (pool->count == pool->capacity) {
-        re_error(RE_ERROR_LEVEL_WARN, "Pool capacity reached.");
-        return RE_POOL_INVALID_HANDLE;
-    }
-
-    u32_t handle_index = 0;
-    _re_pool_entry_t *entry = NULL;
-    for (u32_t i = 0; i < pool->capacity; i++) {
-        entry = _re_pool_get_entry(pool, i);
-        if (!entry->in_use) {
-            handle_index = i;
-            break;
+    _re_pool_node_t *node = pool->free_node;
+    if (node != NULL) {
+        if (node->next != NULL) {
+            node->next->prev = node->prev;
         }
+        pool->free_node = node->next;
+    } else {
+        node = re_arena_push_zero(pool->arena, sizeof(_re_pool_node_t) + pool->size);
+        node->index = re_arena_get_pos(pool->arena) - pool->size;
     }
 
-    re_pool_handle_t handle = {
+    if (pool->used_nodes != NULL) {
+        pool->used_nodes->prev = node;
+    }
+    node->next = pool->used_nodes;
+    pool->used_nodes = node;
+
+    return (re_pool_handle_t) {
         .pool = pool,
-        .handle = handle_index,
-        .generation = entry->generation
+        .index = node->index,
+        .generation = node->generation
     };
-    pool->count++;
-    entry->in_use = true;
-
-    return handle;
-}
-
-b8_t re_pool_handle_valid(re_pool_handle_t handle) {
-    if (handle.pool == NULL || (handle.handle == U32_MAX && handle.generation == U32_MAX)) {
-        return false;
-    }
-    _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
-    return handle.generation == entry->generation;
 }
 
 void re_pool_delete(re_pool_handle_t handle) {
-    if (!re_pool_handle_valid(handle)) {
-        re_error(RE_ERROR_LEVEL_WARN, "Double deleting handle.");
-        return;
+    _re_pool_node_t *node = (_re_pool_node_t *) ((ptr_t) re_pool_get_ptr(handle) - sizeof(_re_pool_node_t));
+    if (handle.pool->free_node != NULL) {
+        handle.pool->free_node->prev = node;
     }
-    _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
-    entry->in_use = false;
-    entry->generation++;
-    ((re_pool_t *) handle.pool)->count--;
+
+    if (node->next != NULL) {  
+        node->next->prev = node->prev;
+    }
+    if (node->prev != NULL) {
+        node->prev->next = node->next;
+    }
+    if (handle.pool->used_nodes == node) {
+        handle.pool->used_nodes = NULL;
+    }
+
+    node->next = handle.pool->free_node;
+    handle.pool->free_node = node;
+    node->generation++;
+}
+
+b8_t re_pool_handle_valid(re_pool_handle_t handle) {
+    if (handle.pool == NULL || (handle.index == U32_MAX && handle.generation == U32_MAX)) {
+        return false;
+    }
+
+    _re_pool_node_t *node = (_re_pool_node_t *) ((ptr_t) re_pool_get_ptr(handle) - sizeof(_re_pool_node_t));
+    return node->generation == handle.generation;
 }
 
 void *re_pool_get_ptr(re_pool_handle_t handle) {
-    if (!re_pool_handle_valid(handle)) {
-        re_error(RE_ERROR_LEVEL_WARN, "Using invalid handle.");
-        return NULL;
-    }
-
-    _re_pool_entry_t *entry = _re_pool_get_entry(handle.pool, handle.handle);
-    return &entry->data;
+    return re_arena_get_index(handle.index, handle.pool->arena);
 }
 
 re_pool_iter_t re_pool_iter_new(re_pool_t *pool) {
-    re_pool_iter_t iter = {
-        .pool = pool
-    };
-    for (; iter.index < pool->capacity; iter.index++) {
-        _re_pool_entry_t *entry = _re_pool_get_entry(pool, iter.index);
-        if (entry->in_use) {
-            return iter;
-        }
+    if (pool->used_nodes == NULL) {
+        return (re_pool_iter_t) {NULL, U32_MAX};
     }
 
     return (re_pool_iter_t) {
-        .pool = NULL,
-        .index = U32_MAX
+        .pool = pool,
+        .index = pool->used_nodes->index
     };
 }
 
 b8_t re_pool_iter_valid(re_pool_iter_t iter) {
-    return iter.pool != NULL && iter.index < iter.pool->capacity;
+    return iter.index != U32_MAX || iter.pool != NULL;
 }
 
 void re_pool_iter_next(re_pool_iter_t *iter) {
-    if (!re_pool_iter_valid(*iter)) {
+    _re_pool_node_t *node = (_re_pool_node_t *) ((ptr_t) re_arena_get_index(iter->index, iter->pool->arena) - sizeof(_re_pool_node_t));
+    if (node->next == NULL) {
+        iter->index = U32_MAX;
+        iter->pool = NULL;
         return;
     }
 
-    iter->index++;
-    for (; iter->index < iter->pool->capacity; iter->index++) {
-        _re_pool_entry_t *entry = _re_pool_get_entry(iter->pool, iter->index);
-        if (entry->in_use) {
-            return;
-        }
-    }
-
-    iter->pool = NULL;
-    iter->index = U32_MAX;
+    iter->index = node->next->index;
 }
 
 re_pool_handle_t re_pool_iter_get(re_pool_iter_t iter) {
@@ -840,13 +817,12 @@ re_pool_handle_t re_pool_iter_get(re_pool_iter_t iter) {
         return RE_POOL_INVALID_HANDLE;
     }
 
-    _re_pool_entry_t *entry = _re_pool_get_entry(iter.pool, iter.index);
-    re_pool_handle_t handle = {
+    _re_pool_node_t *node = (_re_pool_node_t *) ((ptr_t) re_arena_get_index(iter.index, iter.pool->arena) - sizeof(_re_pool_node_t));
+    return (re_pool_handle_t) {
         .pool = iter.pool,
-        .handle = iter.index,
-        .generation = entry->generation
+        .index = node->index,
+        .generation = node->generation
     };
-    return handle;
 }
 
 /*=========================*/

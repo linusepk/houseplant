@@ -772,15 +772,13 @@ typedef struct re_pool_t re_pool_t;
 typedef struct re_pool_handle_t re_pool_handle_t;
 struct re_pool_handle_t {
     re_pool_t *pool;
-    u32_t handle;
+    u32_t index;
     u32_t generation;
 };
 #define RE_POOL_INVALID_HANDLE (re_pool_handle_t) {NULL, U32_MAX, U32_MAX};
 
 // Create a pool.
-RE_API re_pool_t *re_pool_create(u32_t capacity, u32_t object_size);
-// Destroy pool, freeing all memory used.
-RE_API void re_pool_destroy(re_pool_t **pool);
+RE_API re_pool_t *re_pool_create(u32_t object_size, re_arena_t *arena);
 
 // Retrieve a new handle.
 RE_API re_pool_handle_t re_pool_new(re_pool_t *pool);

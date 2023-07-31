@@ -1,7 +1,9 @@
 #include "rebound.h"
 
 void test_pool(void) {
-    re_pool_t *pool = re_pool_create(16, sizeof(u32_t));
+    re_arena_t *arena = re_arena_create(re_os_get_page_size());
+
+    re_pool_t *pool = re_pool_create(sizeof(u32_t), arena);
 
     re_pool_handle_t handle = re_pool_new(pool);
     RE_ENSURE(re_pool_handle_valid(handle), "re_pool_new failed");
@@ -25,5 +27,5 @@ void test_pool(void) {
     RE_ENSURE(count == 8, "re_pool_iter failed");
     re_log_info("re_pool_iter passed");
 
-    re_pool_destroy(&pool);
+    re_arena_destroy(&arena);
 }
