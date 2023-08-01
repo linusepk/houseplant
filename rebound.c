@@ -41,6 +41,7 @@ void re_init(void) {
 }
 
 void re_terminate(void) {
+    _re_arena_scratch_destroy();
     re_os_terminate();
 }
 
@@ -67,14 +68,14 @@ void re_free(void *ptr) { RE_FREE(ptr); }
 /*=========================*/
 
 struct re_arena_t {
-    u32_t capacity;
-    u32_t position;
-    u32_t commited;
+    u64_t capacity;
+    u64_t position;
+    u64_t commited;
     ptr_t pool;
 };
 
-re_arena_t *re_arena_create(u32_t capacity) {
-    u32_t actual_capacity = ((sizeof(re_arena_t) + capacity) + re_os_get_page_size() - 1) & (~re_os_get_page_size() - 1);
+re_arena_t *re_arena_create(u64_t capacity) {
+    u64_t actual_capacity = ((sizeof(re_arena_t) + capacity) + re_os_get_page_size() - 1) & (~re_os_get_page_size() - 1);
     re_arena_t *arena = re_os_mem_reserve(actual_capacity);
     re_os_mem_commit(arena, re_os_get_page_size());
 
@@ -91,7 +92,7 @@ void re_arena_destroy(re_arena_t **arena) {
     *arena = NULL;
 }
 
-void *re_arena_push(re_arena_t *arena, u32_t size) {
+void *re_arena_push(re_arena_t *arena, u64_t size) {
     if (arena->position + size > arena->commited) {
         re_os_mem_commit((ptr_t) arena + arena->commited, re_os_get_page_size());
         arena->commited += re_os_get_page_size();
@@ -102,18 +103,18 @@ void *re_arena_push(re_arena_t *arena, u32_t size) {
     return result;
 }
 
-void *re_arena_push_zero(re_arena_t *arena, u32_t size) {
+void *re_arena_push_zero(re_arena_t *arena, u64_t size) {
     void *result = re_arena_push(arena, size);
 
     ptr_t iter = result;
-    for (u32_t i = 0; i < size; i++) {
+    for (u64_t i = 0; i < size; i++) {
         iter[i] = 0;
     }
 
     return result;
 }
 
-void re_arena_pop(re_arena_t *arena, u32_t size) {
+void re_arena_pop(re_arena_t *arena, u64_t size) {
     if (arena->position <= arena->commited - re_os_get_page_size()) {
         arena->commited -= re_os_get_page_size();
         re_os_mem_decommit((ptr_t) arena + arena->commited, re_os_get_page_size());
@@ -127,11 +128,11 @@ void re_arena_clear(re_arena_t *arena) {
     arena->position = 0;
 }
 
-u32_t re_arena_get_pos(re_arena_t *arena) {
+u64_t re_arena_get_pos(re_arena_t *arena) {
     return arena->position;
 }
 
-void *re_arena_get_index(u32_t index, re_arena_t *arena) {
+void *re_arena_get_index(u64_t index, re_arena_t *arena) {
     return arena->pool + index;
 }
 
@@ -144,6 +145,47 @@ re_arena_temp_t re_arena_temp_start(re_arena_t *arena) {
 
 void re_arena_temp_end(re_arena_temp_t *arena) {
     arena->arena->position = arena->position;
+}
+
+/*=========================*/
+// Scratch arena
+/*=========================*/
+
+#define RE_SCRATCH_POOL_SIZE 2
+
+RE_THREAD_LOCAL re_arena_t *_re_scratch_pool[RE_SCRATCH_POOL_SIZE] = {0};
+
+re_arena_temp_t re_arena_scratch_get(re_arena_t **conflicts, u32_t conflict_count) {
+    if (_re_scratch_pool[0] == NULL) {
+        for (u32_t i = 0; i < RE_SCRATCH_POOL_SIZE; i++) {
+            _re_scratch_pool[i] = re_arena_create(GB(8));
+        }
+    }
+
+    re_arena_temp_t result = {0};
+    for (u32_t i = 0; i < RE_SCRATCH_POOL_SIZE; i++) {
+        b8_t conflict = false;
+        for (u32_t j = 0; j < conflict_count; j++) {
+            if (conflicts[i] == _re_scratch_pool[i]) {
+                conflict = true;
+                break;
+            }
+        }
+        if (!conflict) {
+            result = re_arena_temp_start(_re_scratch_pool[i]);
+            break;
+        }
+    }
+
+    return result;
+}
+
+void _re_arena_scratch_destroy(void) {
+    if (_re_scratch_pool[0] != NULL) {
+        for (u32_t i = 0; i < RE_SCRATCH_POOL_SIZE; i++) {
+            re_arena_destroy(&_re_scratch_pool[i]);
+        }
+    }
 }
 
 /*=========================*/

@@ -26,11 +26,23 @@
 #ifdef _WIN32
 #define RE_OS_WINDOWS
 #error "Windows is currently not supported"
-#endif // _WIN32
+#endif
 
 #ifdef __linux__
 #define RE_OS_LINUX
-#endif // linux
+#endif
+
+#ifdef __clang__
+#define RE_COMPILER_CLANG 1
+#endif
+
+#ifdef __GNUC__
+#define RE_COMPILER_GCC 1
+#endif
+
+#ifdef _MSC_VER
+#define RE_COMPILER_MSVC 1
+#endif
 
 /*=========================*/
 // API macros
@@ -53,6 +65,12 @@
 #define RE_FORMAT_FUNCTION(FORMAT_INDEX, VA_INDEX) __attribute__((format(printf, FORMAT_INDEX, VA_INDEX)))
 #else
 #define RE_FORMAT_FUNCTION(FORMAT_INDEX, VA_INDEX)
+#endif
+
+#if defined(RE_COMPILER_GCC) || defined(RE_COMPILER_CLANG)
+#define RE_THREAD_LOCAL __thread
+#elif defined(RE_COMPILER_MSVC)
+#define RE_THREAD_LOCAL __declspec(thread)
 #endif
 
 /*=========================*/
@@ -125,26 +143,33 @@ RE_API void  re_free(void *ptr);
 
 typedef struct re_arena_t re_arena_t;
 
-RE_API re_arena_t *re_arena_create(u32_t capacity);
+RE_API re_arena_t *re_arena_create(u64_t capacity);
 RE_API void re_arena_destroy(re_arena_t **arena);
 
-RE_API void *re_arena_push(re_arena_t *arena, u32_t size);
-RE_API void *re_arena_push_zero(re_arena_t *arena, u32_t size);
+RE_API void *re_arena_push(re_arena_t *arena, u64_t size);
+RE_API void *re_arena_push_zero(re_arena_t *arena, u64_t size);
 
-RE_API void re_arena_pop(re_arena_t *arena, u32_t size);
+RE_API void re_arena_pop(re_arena_t *arena, u64_t size);
 RE_API void re_arena_clear(re_arena_t *arena);
 
-RE_API u32_t re_arena_get_pos(re_arena_t *arena);
-RE_API void *re_arena_get_index(u32_t index, re_arena_t *arena);
+RE_API u64_t re_arena_get_pos(re_arena_t *arena);
+RE_API void *re_arena_get_index(u64_t index, re_arena_t *arena);
 
+// Temp
 typedef struct re_arena_temp_t re_arena_temp_t;
 struct re_arena_temp_t {
     re_arena_t *arena;
-    u32_t position;
+    u64_t position;
 };
 
 RE_API re_arena_temp_t re_arena_temp_start(re_arena_t *arena);
 RE_API void re_arena_temp_end(re_arena_temp_t *arena);
+
+// Scratch
+RE_API re_arena_temp_t re_arena_scratch_get(re_arena_t **conflicts, u32_t conflict_count);
+#define re_arena_scratch_release(scratch) re_arena_temp_end(scratch)
+
+RE_API void _re_arena_scratch_destroy(void);
 
 /*=========================*/
 // Utils
@@ -220,6 +245,11 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
 #define I32_MAX   ((i32_t)   ~I32_MIN)
 #define I64_MAX   ((i64_t)   ~I64_MIN)
 #define ISIZE_MAX ((isize_t) ~ISIZE_MIN)
+
+#define KB(n) (n << 10)
+#define MB(n) (n << 20)
+#define GB(n) ((u64_t) n << 30)
+#define TB(n) ((u64_t) n << 40)
 
 #define re_bit(N) (1 << (N))
 #define re_bit_set(M, N, V) \
