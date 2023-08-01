@@ -1038,10 +1038,33 @@ re_func_ptr_t re_lib_func(const re_lib_t *lib, const char *name) {
 /*=========================*/
 
 // Threads
+typedef struct _re_thread_context_t _re_thread_context_t;
+struct _re_thread_context_t {
+    re_thread_func_t func;
+    void *arg;
+};
+
+static void *_re_thread_func_cleanup(void *arg) {
+    _re_thread_context_t *ctx = arg;
+    ctx->func(ctx->arg);
+    _re_arena_scratch_destroy();
+    return NULL;
+}
+
 re_thread_t re_thread_create(re_thread_func_t func, void *arg) {
     re_thread_t thread = {0};
-    typedef void *(*_re_pthread_func_t)(void *);
-    pthread_create(&thread.handle, NULL, *(_re_pthread_func_t *)&func, arg);
+    re_arena_temp_t scratch = re_arena_scratch_get(NULL, 0);
+    _re_thread_context_t *ctx = re_arena_push(scratch.arena, sizeof(_re_thread_context_t));
+    *ctx = (_re_thread_context_t) {
+        .func = func,
+        .arg = arg
+    };
+    pthread_create(
+            &thread.handle,
+            NULL,
+            _re_thread_func_cleanup,
+            ctx);
+    re_arena_scratch_release(&scratch);
     return thread;
 }
 
