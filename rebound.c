@@ -27,16 +27,21 @@
 // Global state
 /*=========================*/
 
-/* typedef struct _rebound_state_t _rebound_state_t; */
-/* struct _rebound_state_t { */
-/* }; */
-/* static _rebound_state_t _re_state = {0}; */
+typedef struct _rebound_state_t _rebound_state_t;
+struct _rebound_state_t {
+    // Mutex to ensure scratch memory lives long enough to be dereferenced.
+    re_mutex_t *thread_mutex;
+
+};
+static _rebound_state_t _re_state = {0};
 
 /*=========================*/
 // Initialization
 /*=========================*/
 
 void re_init(void) {
+    _re_state.thread_mutex = re_mutex_create();
+
     re_os_init();
 }
 
@@ -1045,14 +1050,17 @@ struct _re_thread_context_t {
 };
 
 static void *_re_thread_func_cleanup(void *arg) {
-    _re_thread_context_t *ctx = arg;
-    ctx->func(ctx->arg);
+    _re_thread_context_t ctx = *(_re_thread_context_t *) arg;
+    re_mutex_unlock(_re_state.thread_mutex);
+    ctx.func(ctx.arg);
     _re_arena_scratch_destroy();
     return NULL;
 }
 
 re_thread_t re_thread_create(re_thread_func_t func, void *arg) {
     re_thread_t thread = {0};
+
+    re_mutex_lock(_re_state.thread_mutex);
     re_arena_temp_t scratch = re_arena_scratch_get(NULL, 0);
     _re_thread_context_t *ctx = re_arena_push(scratch.arena, sizeof(_re_thread_context_t));
     *ctx = (_re_thread_context_t) {
@@ -1065,6 +1073,7 @@ re_thread_t re_thread_create(re_thread_func_t func, void *arg) {
             _re_thread_func_cleanup,
             ctx);
     re_arena_scratch_release(&scratch);
+
     return thread;
 }
 
