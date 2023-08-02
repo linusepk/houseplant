@@ -796,6 +796,7 @@ struct re_pool_t {
     u32_t size;
     _re_pool_node_t *free_node;
     _re_pool_node_t *used_nodes;
+    u32_t count;
 };
 
 re_pool_t *re_pool_create(u32_t object_size, re_arena_t *arena) {
@@ -807,6 +808,10 @@ re_pool_t *re_pool_create(u32_t object_size, re_arena_t *arena) {
     pool->used_nodes = NULL;
 
     return pool;
+}
+
+u32_t re_pool_get_count(const re_pool_t *pool) {
+    return pool->count;
 }
 
 re_pool_handle_t re_pool_new(re_pool_t *pool) {
@@ -827,6 +832,7 @@ re_pool_handle_t re_pool_new(re_pool_t *pool) {
     node->next = pool->used_nodes;
     pool->used_nodes = node;
 
+    pool->count++;
     return (re_pool_handle_t) {
         .pool = pool,
         .index = node->index,
@@ -853,6 +859,7 @@ void re_pool_delete(re_pool_handle_t handle) {
     node->next = handle.pool->free_node;
     handle.pool->free_node = node;
     node->generation++;
+    handle.pool->count--;
 }
 
 b8_t re_pool_handle_valid(re_pool_handle_t handle) {

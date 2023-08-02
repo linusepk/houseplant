@@ -822,6 +822,7 @@ struct re_pool_handle_t {
 
 // Create a pool.
 RE_API re_pool_t *re_pool_create(u32_t object_size, re_arena_t *arena);
+RE_API u32_t re_pool_get_count(const re_pool_t *pool);
 
 // Retrieve a new handle.
 RE_API re_pool_handle_t re_pool_new(re_pool_t *pool);
@@ -831,6 +832,7 @@ RE_API void re_pool_delete(re_pool_handle_t handle);
 RE_API void *re_pool_get_ptr(re_pool_handle_t handle);
 // Check if handle if still valid.
 RE_API b8_t re_pool_handle_valid(re_pool_handle_t handle);
+
 
 typedef struct re_pool_iter_t re_pool_iter_t;
 struct re_pool_iter_t {
