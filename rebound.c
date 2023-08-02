@@ -93,7 +93,7 @@ void re_arena_destroy(re_arena_t **arena) {
 }
 
 void *re_arena_push(re_arena_t *arena, u64_t size) {
-    if (arena->position + size > arena->commited) {
+    while (arena->position + size >= arena->commited) {
         re_os_mem_commit((ptr_t) arena + arena->commited, re_os_get_page_size());
         arena->commited += re_os_get_page_size();
     }
@@ -115,7 +115,7 @@ void *re_arena_push_zero(re_arena_t *arena, u64_t size) {
 }
 
 void re_arena_pop(re_arena_t *arena, u64_t size) {
-    if (arena->position <= arena->commited - re_os_get_page_size()) {
+    while (arena->position <= arena->commited - re_os_get_page_size()) {
         arena->commited -= re_os_get_page_size();
         re_os_mem_decommit((ptr_t) arena + arena->commited, re_os_get_page_size());
     }
