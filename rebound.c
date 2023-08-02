@@ -715,6 +715,46 @@ b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b) {
 re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {x, y, z, w}; }
 re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {scaler, scaler, scaler, scaler}; }
 
+re_vec4_t re_vec4_mul(re_vec4_t a, re_vec4_t b) {
+    return re_vec4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w);
+}
+
+re_vec4_t re_vec4_div(re_vec4_t a, re_vec4_t b) {
+    return re_vec4(a.x/b.x, a.y/b.y, a.z/b.z, a.w/b.w);
+}
+
+re_vec4_t re_vec4_add(re_vec4_t a, re_vec4_t b) {
+    return re_vec4(a.x+b.x, a.y+b.y, a.z+b.z, a.w+b.w);
+}
+
+re_vec4_t re_vec4_sub(re_vec4_t a, re_vec4_t b) {
+    return re_vec4(a.x-b.x, a.y-b.y, a.z-b.z, a.w-b.w);
+}
+
+re_vec4_t re_vec4_muls(re_vec4_t vec, f32_t scaler) {
+    return re_vec4(vec.x*scaler, vec.y*scaler, vec.z*scaler, vec.w*scaler);
+}
+
+re_vec4_t re_vec4_divs(re_vec4_t vec, f32_t scaler) {
+    return re_vec4(vec.x/scaler, vec.y/scaler, vec.z/scaler, vec.w/scaler);
+}
+
+re_vec4_t re_vec4_adds(re_vec4_t vec, f32_t scaler) {
+    return re_vec4(vec.x+scaler, vec.y+scaler, vec.z+scaler, vec.w+scaler);
+}
+
+re_vec4_t re_vec4_subs(re_vec4_t vec, f32_t scaler) {
+    return re_vec4(vec.x-scaler, vec.y-scaler, vec.z-scaler, vec.w-scaler);
+}
+
+re_vec4_t re_vec4_normalize(re_vec4_t vec) {
+    return re_vec4_muls(vec, 1.0f / re_vec4_magnitude(vec));
+}
+
+f32_t re_vec4_magnitude(re_vec4_t vec) {
+    return sqrtf(vec.x*vec.x + vec.y*vec.y + vec.z*vec.z + vec.w*vec.w);
+}
+
 b8_t re_vec4_equal(re_vec4_t a, re_vec4_t b) {
     return a.x == b.x && a.y == b.y && a.z == b.y && a.w == b.w;
 }

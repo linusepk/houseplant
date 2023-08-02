@@ -780,6 +780,19 @@ struct re_vec4_t {
 RE_API re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w);
 RE_API re_vec4_t re_vec4s(f32_t scaler);
 
+RE_API re_vec4_t re_vec4_mul(re_vec4_t a, re_vec4_t b);
+RE_API re_vec4_t re_vec4_div(re_vec4_t a, re_vec4_t b);
+RE_API re_vec4_t re_vec4_add(re_vec4_t a, re_vec4_t b);
+RE_API re_vec4_t re_vec4_sub(re_vec4_t a, re_vec4_t b);
+
+RE_API re_vec4_t re_vec4_muls(re_vec4_t vec, f32_t scaler);
+RE_API re_vec4_t re_vec4_divs(re_vec4_t vec, f32_t scaler);
+RE_API re_vec4_t re_vec4_adds(re_vec4_t vec, f32_t scaler);
+RE_API re_vec4_t re_vec4_subs(re_vec4_t vec, f32_t scaler);
+
+RE_API re_vec4_t re_vec4_normalize(re_vec4_t vec);
+RE_API f32_t re_vec4_magnitude(re_vec4_t vec);
+
 RE_API b8_t re_vec4_equal(re_vec4_t a, re_vec4_t b);
 
 // 4x4 matrix.
