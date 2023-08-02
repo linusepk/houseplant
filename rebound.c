@@ -75,7 +75,7 @@ struct re_arena_t {
 };
 
 re_arena_t *re_arena_create(u64_t capacity) {
-    u64_t actual_capacity = ((sizeof(re_arena_t) + capacity) + re_os_get_page_size() - 1) & (~re_os_get_page_size() - 1);
+    u64_t actual_capacity = ((sizeof(re_arena_t) + capacity) + (u64_t) re_os_get_page_size() - 1) & (~(u64_t) re_os_get_page_size() - 1);
     re_arena_t *arena = re_os_mem_reserve(actual_capacity);
     re_os_mem_commit(arena, re_os_get_page_size());
 
