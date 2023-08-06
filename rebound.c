@@ -80,7 +80,7 @@ re_arena_t *re_arena_create(u64_t capacity) {
     re_os_mem_commit(arena, re_os_get_page_size());
 
     arena->capacity = actual_capacity;
-    arena->position = 0;
+    arena->position = sizeof(re_arena_t);
     arena->commited = re_os_get_page_size();
     arena->pool = (ptr_t) arena + sizeof(re_arena_t);
 
@@ -98,17 +98,16 @@ void *re_arena_push(re_arena_t *arena, u64_t size) {
         arena->commited += re_os_get_page_size();
     }
 
-    void *result = arena->pool + arena->position;
+    void *result = (ptr_t) arena + arena->position;
     arena->position += size;
     return result;
 }
 
 void *re_arena_push_zero(re_arena_t *arena, u64_t size) {
-    void *result = re_arena_push(arena, size);
+    ptr_t result = re_arena_push(arena, size);
 
-    ptr_t iter = result;
     for (u64_t i = 0; i < size; i++) {
-        iter[i] = 0;
+        result[i] = 0;
     }
 
     return result;
