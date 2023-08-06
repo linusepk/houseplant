@@ -124,7 +124,7 @@ void re_arena_pop(re_arena_t *arena, u64_t size) {
 void re_arena_clear(re_arena_t *arena) {
     re_os_mem_decommit((ptr_t) arena + re_os_get_page_size(), arena->commited - re_os_get_page_size());
     arena->commited = re_os_get_page_size();
-    arena->position = 0;
+    arena->position = sizeof(re_arena_t);
 }
 
 u64_t re_arena_get_pos(re_arena_t *arena) {
@@ -132,7 +132,7 @@ u64_t re_arena_get_pos(re_arena_t *arena) {
 }
 
 void *re_arena_get_index(u64_t index, re_arena_t *arena) {
-    return arena->pool + index;
+    return (ptr_t) arena + index;
 }
 
 re_arena_temp_t re_arena_temp_start(re_arena_t *arena) {
