@@ -656,6 +656,20 @@ re_vec2_t re_ivec2_to_vec2(re_ivec2_t vec) {
 // 3D vector.
 re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z) { return (re_vec3_t){x, y, z}; }
 re_vec3_t re_vec3s(f32_t scaler) { return re_vec3(scaler, scaler, scaler); }
+re_vec3_t re_vec3_hex1(u32_t hex) {
+    return re_vec3(
+            (f32_t) ((hex >> 8 * 2) & 0xff) / (f32_t) 0xff,
+            (f32_t) ((hex >> 8 * 1) & 0xff) / (f32_t) 0xff,
+            (f32_t) ((hex >> 8 * 0) & 0xff) / (f32_t) 0xff
+        );
+}
+re_vec3_t re_vec3_hex255(u32_t hex) {
+    return re_vec3(
+            (hex >> 8 * 2) & 0xff,
+            (hex >> 8 * 1) & 0xff,
+            (hex >> 8 * 0) & 0xff
+        );
+}
 
 re_vec3_t re_vec3_mul(re_vec3_t a, re_vec3_t b) {
     return re_vec3(a.x * b.x, a.y * b.y, a.z * b.z);
@@ -705,6 +719,13 @@ b8_t re_vec3_equal(re_vec3_t a, re_vec3_t b) {
 // 3D integer vector.
 re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t){x, y, z}; }
 re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }
+re_ivec3_t re_ivec3_hex255(u32_t hex) {
+    return re_ivec3(
+            (hex >> 8 * 2) & 0xff,
+            (hex >> 8 * 1) & 0xff,
+            (hex >> 8 * 0) & 0xff
+        );
+}
 
 b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b) {
     return a.x == b.x && a.y == b.y && a.z == b.y;
@@ -713,6 +734,22 @@ b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b) {
 // 4D vector.
 re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {x, y, z, w}; }
 re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {scaler, scaler, scaler, scaler}; }
+re_vec4_t re_vec4_hex1(u32_t hex) {
+    return re_vec4(
+            (f32_t) ((hex >> 8 * 3) & 0xff) / (f32_t) 0xff,
+            (f32_t) ((hex >> 8 * 2) & 0xff) / (f32_t) 0xff,
+            (f32_t) ((hex >> 8 * 1) & 0xff) / (f32_t) 0xff,
+            (f32_t) ((hex >> 8 * 0) & 0xff) / (f32_t) 0xff
+        );
+}
+re_vec4_t re_vec4_hex255(u32_t hex) {
+    return re_vec4(
+            (hex >> 8 * 3) & 0xff,
+            (hex >> 8 * 2) & 0xff,
+            (hex >> 8 * 1) & 0xff,
+            (hex >> 8 * 0) & 0xff
+        );
+}
 
 re_vec4_t re_vec4_mul(re_vec4_t a, re_vec4_t b) {
     return re_vec4(a.x*b.x, a.y*b.y, a.z*b.z, a.w*b.w);

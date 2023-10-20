@@ -742,6 +742,8 @@ struct re_vec3_t {
 
 RE_API re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z);
 RE_API re_vec3_t re_vec3s(f32_t scaler);
+RE_API re_vec3_t re_vec3_hex1(u32_t hex);
+RE_API re_vec3_t re_vec3_hex255(u32_t hex);
 
 RE_API re_vec3_t re_vec3_mul(re_vec3_t a, re_vec3_t b);
 RE_API re_vec3_t re_vec3_div(re_vec3_t a, re_vec3_t b);
@@ -768,6 +770,8 @@ struct re_ivec3_t {
 
 RE_API re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z);
 RE_API re_ivec3_t re_ivec3s(i32_t scaler);
+RE_API re_ivec3_t re_ivec3_hex1(u32_t hex);
+RE_API re_ivec3_t re_ivec3_hex255(u32_t hex);
 
 RE_API b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b);
 
@@ -779,6 +783,8 @@ struct re_vec4_t {
 
 RE_API re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w);
 RE_API re_vec4_t re_vec4s(f32_t scaler);
+RE_API re_vec4_t re_vec4_hex1(u32_t hex);
+RE_API re_vec4_t re_vec4_hex255(u32_t hex);
 
 RE_API re_vec4_t re_vec4_mul(re_vec4_t a, re_vec4_t b);
 RE_API re_vec4_t re_vec4_div(re_vec4_t a, re_vec4_t b);
