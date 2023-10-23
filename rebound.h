@@ -686,6 +686,9 @@ struct re_vec2v_t {
     f32_t v[2];
 };
 
+#define re_vec2_to_vec2v(VEC) (*(re_vec2v_t *) &(VEC))
+#define re_vec2v_to_vec2(VEC) (*(re_vec2_t *) &(VEC))
+
 RE_API re_vec2_t re_vec2(f32_t x, f32_t y);
 RE_API re_vec2_t re_vec2s(f32_t scaler);
 
@@ -717,6 +720,9 @@ typedef struct re_ivec2v_t re_ivec2v_t;
 struct re_ivec2v_t {
     i32_t v[2];
 };
+
+#define re_ivec2_to_ivec2v(VEC) (*(re_ivec2v_t *) &(VEC))
+#define re_ivec2v_to_ivec2(VEC) (*(re_ivec2_t *) &(VEC))
 
 RE_API re_ivec2_t re_ivec2(i32_t x, i32_t y);
 RE_API re_ivec2_t re_ivec2s(i32_t scaler);
@@ -754,6 +760,9 @@ struct re_vec3v_t {
     f32_t v[3];
 };
 
+#define re_vec3_to_vec3v(VEC) (*(re_vec3v_t *) &(VEC))
+#define re_vec3v_to_vec3(VEC) (*(re_vec3_t *) &(VEC))
+
 RE_API re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z);
 RE_API re_vec3_t re_vec3s(f32_t scaler);
 RE_API re_vec3_t re_vec3_hex1(u32_t hex);
@@ -785,6 +794,9 @@ typedef struct re_ivec3v_t re_ivec3v_t;
 struct re_ivec3v_t {
     i32_t v[3];
 };
+
+#define re_ivec3_to_ivec3v(VEC) (*(re_ivec3v_t *) &(VEC))
+#define re_ivec3v_to_ivec3(VEC) (*(re_ivec3_t *) &(VEC))
 
 RE_API re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z);
 RE_API re_ivec3_t re_ivec3s(i32_t scaler);
