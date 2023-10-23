@@ -445,6 +445,8 @@ RE_API re_str_t re_str_suffix(re_str_t string, usize_t len);
 RE_API re_str_t re_str_chop(re_str_t string, usize_t len);
 RE_API re_str_t re_str_skip(re_str_t string, usize_t len);
 RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
+RE_API re_str_t re_str_pushf(const char *fmt, va_list args, re_arena_t *arena);
+RE_API re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena);
 
 /*=========================*/
 // Linked lists

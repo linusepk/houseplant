@@ -278,6 +278,31 @@ i32_t re_str_cmp(re_str_t a, re_str_t b) {
     return 0;
 }
 
+re_str_t re_str_pushf(const char *fmt, va_list args, re_arena_t *arena) {
+    // Copy so we can run vsnprintf twice.
+    // Once to calculate the needed length, second time to format string.
+    va_list format_args;
+    va_copy(format_args, args);
+
+    // Add 1 for NULL terminator.
+    u32_t len = vsnprintf(NULL, 0, fmt, args) + 1;
+
+    u8_t *cstr = re_arena_push_zero(arena, len);
+    vsnprintf((char *) cstr, len, fmt, format_args);
+
+    // Subtract 1 from length for NULL terminator.
+    return re_str(cstr, len - 1);
+}
+
+re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena) {
+    u8_t *cstr = re_arena_push(arena, str.len);
+    for (u32_t i = 0; i < str.len; i++) {
+        cstr[i] = str.str[i];
+    }
+
+    return re_str(cstr, str.len);
+}
+
 /*=========================*/
 // Dynamic array
 /*=========================*/
