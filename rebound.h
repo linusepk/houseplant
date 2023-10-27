@@ -677,17 +677,12 @@ RE_API void _re_log(
 #define DEG(RADS) (RADS * 57.2957795)
 
 // 2D vector.
-typedef struct re_vec2_t re_vec2_t;
-struct re_vec2_t {
-    f32_t x, y;
+typedef union re_vec2_t re_vec2_t;
+union re_vec2_t {
+    struct { f32_t x, y; };
+    struct { f32_t u, v; };
+    f32_t f[2];
 };
-typedef struct re_vec2v_t re_vec2v_t;
-struct re_vec2v_t {
-    f32_t v[2];
-};
-
-#define re_vec2_to_vec2v(VEC) (*(re_vec2v_t *) &(VEC))
-#define re_vec2v_to_vec2(VEC) (*(re_vec2_t *) &(VEC))
 
 RE_API re_vec2_t re_vec2(f32_t x, f32_t y);
 RE_API re_vec2_t re_vec2s(f32_t scaler);
@@ -712,17 +707,12 @@ RE_API f32_t re_vec2_dot(re_vec2_t a, re_vec2_t b);
 RE_API b8_t re_vec2_equal(re_vec2_t a, re_vec2_t b);
 
 // 2D integer vector.
-typedef struct re_ivec2_t re_ivec2_t;
-struct re_ivec2_t {
-    i32_t x, y;
+typedef union re_ivec2_t re_ivec2_t;
+union re_ivec2_t {
+    struct { i32_t x, y; };
+    struct { i32_t u, v; };
+    i32_t f[2];
 };
-typedef struct re_ivec2v_t re_ivec2v_t;
-struct re_ivec2v_t {
-    i32_t v[2];
-};
-
-#define re_ivec2_to_ivec2v(VEC) (*(re_ivec2v_t *) &(VEC))
-#define re_ivec2v_to_ivec2(VEC) (*(re_ivec2_t *) &(VEC))
 
 RE_API re_ivec2_t re_ivec2(i32_t x, i32_t y);
 RE_API re_ivec2_t re_ivec2s(i32_t scaler);
@@ -751,17 +741,12 @@ RE_API re_ivec2_t re_vec2_to_ivec2(re_vec2_t vec);
 RE_API re_vec2_t re_ivec2_to_vec2(re_ivec2_t vec);
 
 // 3D vector.
-typedef struct re_vec3_t re_vec3_t;
-struct re_vec3_t {
-    f32_t x, y, z;
+typedef union re_vec3_t re_vec3_t;
+union re_vec3_t {
+    struct { f32_t x, y, z; };
+    struct { f32_t r, g, b; };
+    f32_t f[3];
 };
-typedef struct re_vec3v_t re_vec3v_t;
-struct re_vec3v_t {
-    f32_t v[3];
-};
-
-#define re_vec3_to_vec3v(VEC) (*(re_vec3v_t *) &(VEC))
-#define re_vec3v_to_vec3(VEC) (*(re_vec3_t *) &(VEC))
 
 RE_API re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z);
 RE_API re_vec3_t re_vec3s(f32_t scaler);
@@ -786,13 +771,11 @@ RE_API f32_t re_vec3_dot(re_vec3_t a, re_vec3_t b);
 RE_API b8_t re_vec3_equal(re_vec3_t a, re_vec3_t b);
 
 // 3D integer vector.
-typedef struct re_ivec3_t re_ivec3_t;
-struct re_ivec3_t {
-    i32_t x, y, z;
-};
-typedef struct re_ivec3v_t re_ivec3v_t;
-struct re_ivec3v_t {
-    i32_t v[3];
+typedef union re_ivec3_t re_ivec3_t;
+union re_ivec3_t {
+    struct { i32_t x, y, z; };
+    struct { i32_t r, g, b; };
+    i32_t f[3];
 };
 
 #define re_ivec3_to_ivec3v(VEC) (*(re_ivec3v_t *) &(VEC))
@@ -806,13 +789,11 @@ RE_API re_ivec3_t re_ivec3_hex255(u32_t hex);
 RE_API b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b);
 
 // 4D vector.
-typedef struct re_vec4_t re_vec4_t;
-struct re_vec4_t {
-    f32_t x, y, z, w;
-};
-typedef struct re_vec4v_t re_vec4v_t;
-struct re_vec4v_t {
-    f32_t v[4];
+typedef union re_vec4_t re_vec4_t;
+union re_vec4_t {
+    struct { f32_t x, y, z, w; };
+    struct { f32_t r, g, b, a; };
+    f32_t f[4];
 };
 
 RE_API re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w);
@@ -836,17 +817,14 @@ RE_API f32_t re_vec4_magnitude(re_vec4_t vec);
 RE_API b8_t re_vec4_equal(re_vec4_t a, re_vec4_t b);
 
 // 4x4 matrix.
-typedef struct re_mat4_t re_mat4_t;
-struct re_mat4_t {
-    re_vec4_t i, j, k, l;
+typedef union re_mat4_t re_mat4_t;
+union re_mat4_t {
+    struct { re_vec4_t i, j, k, l; };
+    re_vec4_t v[4];
+    f32_t f1[16];
+    f32_t f2[4][4];
 };
 typedef union re_mat4v_t re_mat4v_t;
-union re_mat4v_t {
-    re_vec4_t v[4];
-    re_vec4v_t vv[4];
-    f32_t vf[16];
-    f32_t vf2[4][4];
-};
 
 // Creates a 4x4 identity matrix.
 RE_API re_mat4_t re_mat4_identity(void);
