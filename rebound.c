@@ -570,7 +570,7 @@ void re_logger_set_level(re_log_level_t level) { _re_logger.level = level; }
 /*=========================*/
 
 // 2D vector.
-re_vec2_t re_vec2(f32_t x, f32_t y) { return (re_vec2_t){x, y}; }
+re_vec2_t re_vec2(f32_t x, f32_t y) { return (re_vec2_t) {{x, y}}; }
 re_vec2_t re_vec2s(f32_t scaler) { return re_vec2(scaler, scaler); }
 
 re_vec2_t re_vec2_mul(re_vec2_t a, re_vec2_t b) {
@@ -619,7 +619,7 @@ b8_t re_vec2_equal(re_vec2_t a, re_vec2_t b) {
 }
 
 // 2D integer vector.
-re_ivec2_t re_ivec2(i32_t x, i32_t y) { return (re_ivec2_t){x, y}; }
+re_ivec2_t re_ivec2(i32_t x, i32_t y) { return (re_ivec2_t) {{x, y}}; }
 re_ivec2_t re_ivec2s(i32_t scaler) { return re_ivec2(scaler, scaler); }
 
 re_ivec2_t re_ivec2_mul(re_ivec2_t a, re_ivec2_t b) {
@@ -679,7 +679,7 @@ re_vec2_t re_ivec2_to_vec2(re_ivec2_t vec) {
 }
 
 // 3D vector.
-re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z) { return (re_vec3_t){x, y, z}; }
+re_vec3_t re_vec3(f32_t x, f32_t y, f32_t z) { return (re_vec3_t) {{x, y, z}}; }
 re_vec3_t re_vec3s(f32_t scaler) { return re_vec3(scaler, scaler, scaler); }
 re_vec3_t re_vec3_hex1(u32_t hex) {
     return re_vec3(
@@ -742,7 +742,7 @@ b8_t re_vec3_equal(re_vec3_t a, re_vec3_t b) {
 
 
 // 3D integer vector.
-re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t){x, y, z}; }
+re_ivec3_t re_ivec3(i32_t x, i32_t y, i32_t z) { return (re_ivec3_t) {{x, y, z}}; }
 re_ivec3_t re_ivec3s(i32_t scaler) { return re_ivec3(scaler, scaler, scaler); }
 re_ivec3_t re_ivec3_hex255(u32_t hex) {
     return re_ivec3(
@@ -757,8 +757,8 @@ b8_t re_ivec3_equal(re_ivec3_t a, re_ivec3_t b) {
 }
 
 // 4D vector.
-re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {x, y, z, w}; }
-re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {scaler, scaler, scaler, scaler}; }
+re_vec4_t re_vec4(f32_t x, f32_t y, f32_t z, f32_t w) { return (re_vec4_t) {{x, y, z, w}}; }
+re_vec4_t re_vec4s(f32_t scaler) { return (re_vec4_t) {{scaler, scaler, scaler, scaler}}; }
 re_vec4_t re_vec4_hex1(u32_t hex) {
     return re_vec4(
             (f32_t) ((hex >> 8 * 3) & 0xff) / (f32_t) 0xff,
@@ -822,7 +822,7 @@ b8_t re_vec4_equal(re_vec4_t a, re_vec4_t b) {
 
 // 4x4 matrix.
 re_mat4_t re_mat4_identity(void) {
-    return (re_mat4_t){{1, 0, 0, 0}, {0, 1, 0, 0}, {0, 0, 1, 0}, {0, 0, 0, 1}};
+    return (re_mat4_t) {{{{1, 0, 0, 0}}, {{0, 1, 0, 0}}, {{0, 0, 1, 0}}, {{0, 0, 0, 1}}}};
 }
 
 re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top,
@@ -832,12 +832,12 @@ re_mat4_t re_mat4_orthographic_projection(f32_t left, f32_t right, f32_t top,
     f32_t tb =  1.0f / (top   - bottom);
     f32_t fn = -1.0f / (far   - near);
 
-    return (re_mat4_t){
-        {2.0f * rl, 0, 0, -(right+left) * rl},
-        {0, 2.0f * tb, 0, -(top+bottom) * tb},
-        {0, 0, -fn, near * fn},
-        {0, 0, 0, 1},
-    };
+    return (re_mat4_t) {{
+        {{2.0f * rl, 0, 0, -(right+left) * rl}},
+        {{0, 2.0f * tb, 0, -(top+bottom) * tb}},
+        {{0, 0, -fn, near * fn}},
+        {{0, 0, 0, 1}},
+    }};
 }
 
 /*=========================*/
