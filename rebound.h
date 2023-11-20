@@ -266,164 +266,91 @@ RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
 RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_FUNCTION(2, 3);
 
 /*=========================*/
-// Hash table
+// Hash map
 /*=========================*/
 
-#ifndef RE_HT_INIT_CAP
-#define RE_HT_INIT_CAP  8
-#endif
-
-#ifndef RE_HT_MAX_FILL
-#define RE_HT_MAX_FILL  0.5f
-#endif
-
-#ifndef RE_HT_GROW_RATE
-#define RE_HT_GROW_RATE 2
-#endif
-
-// Declares a new hash table.
-#define re_ht_t(K, V) struct { \
-    struct { \
-        usize_t hash; \
-        K key; \
-        V value; \
-        b8_t alive; \
-    } *entries; \
-    usize_t count; \
-    usize_t capacity; \
-    usize_t key_size; \
-    K temp_key; \
-    re_hash_func_t hash_func; \
-} *
-
-// Initializes a hash table.
-#define re_ht_create(HT, HASH_FUNC) do { \
-    (HT) = re_malloc(sizeof(__typeof__(*(HT)))); \
-    (HT)->entries = re_malloc(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
-    memset((HT)->entries, 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
-    (HT)->count = 0; \
-    (HT)->capacity = RE_HT_INIT_CAP; \
-    (HT)->key_size = sizeof((HT)->temp_key); \
-    (HT)->hash_func = (HASH_FUNC); \
-} while (0)
-
-// Frees all data used by hash table.
-#define re_ht_destroy(HT) do { \
-    re_free((HT)->entries); \
-    re_free((HT)); \
-    (HT) = NULL; \
-} while (0)
-
-// If key isn't present within the hash table it will be added.
-// If it is present it will instead be updated.
-#define re_ht_set(HT, KEY, VALUE) do { \
-    (HT)->temp_key = KEY; \
-    if ((HT)->count + 1 > (HT)->capacity * RE_HT_MAX_FILL) { \
-        _re_ht_resize(HT); \
-    } \
-    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&(HT)->temp_key, (HT)->key_size); \
-    _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
-    if (!re_macro_var(entry)->alive) { \
-        (HT)->count++; \
-    } \
-    re_macro_var(entry)->hash = re_macro_var(hash); \
-    re_macro_var(entry)->key = (HT)->temp_key; \
-    re_macro_var(entry)->value = (VALUE); \
-    re_macro_var(entry)->alive = true; \
-} while (0)
-
-// If key is present within the hash table OUT will be set to the retrieved value, if not nothing will happen.
-#define re_ht_get(HT, KEY, OUT) do { \
-    (HT)->temp_key = KEY; \
-    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&(HT)->temp_key, (HT)->key_size); \
-    _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
-    if (re_macro_var(entry)->alive) {                                                         \
-        (OUT) = re_macro_var(entry)->value; \
-    } \
-} while (0)
-
-// Removes an entry from the hash table. If it doesn't exist nothing happens.
-#define re_ht_remove(HT, KEY) do { \
-    __typeof__(KEY) re_macro_var(temp_key) = (KEY); \
-    __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
-    usize_t re_macro_var(hash) = (HT)->hash_func(&re_macro_var(temp_key), (HT)->key_size); \
-    _re_ht_get_entry((HT)->entries, (HT)->capacity, re_macro_var(hash), re_macro_var(entry)); \
-    if (re_macro_var(entry)->alive) { \
-        (HT)->count--; \
-    } \
-    re_macro_var(entry)->alive = false; \
-} while (0)
-
-// Clears all the entries from the hash table.
-#define re_ht_clear(HT) do { \
-    __typeof__((HT)->entries) re_macro_var(new_entries) = re_malloc(RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
-    memset(re_macro_var(new_entries), 0, RE_HT_INIT_CAP * sizeof(__typeof__(*(HT)->entries))); \
-    re_free((HT)->entries); \
-    (HT)->entries = re_macro_var(new_entries); \
-    (HT)->capacity = RE_HT_INIT_CAP; \
-    (HT)->count = 0; \
-} while (0)
-
-// Retrieves the current active entry count.
-#define re_ht_count(HT) (HT)->count
-
-typedef usize_t re_ht_iter_t;
-
-// Retrieves the first valid iterator.
-#define re_ht_iter_new(HT) _re_ht_iter_next((HT), 0)
-// Checks if the iterator is still valid and usable.
-#define re_ht_iter_valid(HT, ITER) (ITER) < (HT)->capacity
-// Advances iterator to next valid iteration.
-#define re_ht_iter_advance(HT, ITER) (ITER) = _re_ht_iter_next((HT), (ITER) + 1)
-
-// Gets the key and value at the given iteration.
-#define re_ht_get_iter(HT, ITER, KEY, VALUE) do { \
-    (KEY) = (HT)->entries[(ITER)].key; \
-    (VALUE) = (HT)->entries[(ITER)].value; \
-} while (0)
-
-// Private API
-#define _re_ht_get_entry(ENTRIES, CAP, HASH, OUT_ENTRY) do { \
-    usize_t re_macro_var(index) = (HASH) % (CAP); \
-    for (;;) { \
-        if (!(ENTRIES)[re_macro_var(index)].alive || (ENTRIES)[re_macro_var(index)].hash == (HASH)) { \
-            (OUT_ENTRY) = &(ENTRIES)[re_macro_var(index)]; \
-            break; \
+#define _re_hash_map_get_bucket_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next) ({ \
+        __typeof__(*(HASH_MAP)) *result = NULL; \
+        u64_t _hash = HASH_FUNC(KEY); \
+        u32_t index = _hash % (CAPACITY); \
+        __typeof__(*(HASH_MAP)) *bucket = &(HASH_MAP)[index]; \
+        for (__typeof__(*(HASH_MAP)) *curr = bucket->first; curr != NULL; curr = curr->next) { \
+            if (curr->hash == _hash) { \
+                result = curr; \
+                break; \
+            } \
         } \
-        re_macro_var(index)= (re_macro_var(index) + 1) % (CAP); \
-    } \
-} while (0)
+        result; \
+    })
 
-#define _re_ht_resize(HT) do { \
-    usize_t re_macro_var(new_cap) = (HT)->capacity * RE_HT_GROW_RATE; \
-    usize_t re_macro_var(size) = re_macro_var(new_cap) * sizeof(__typeof__(*(HT)->entries)); \
-    __typeof__((HT)->entries) re_macro_var(new_entries) = re_malloc(re_macro_var(size)); \
-    memset(re_macro_var(new_entries), 0, re_macro_var(size)); \
-    for (usize_t i = 0; i < (HT)->capacity; i++) { \
-        __typeof__(*(HT)->entries) re_macro_var(old) = (HT)->entries[i]; \
-        if (!re_macro_var(old).alive) { \
-            continue; \
+// Returns true if a conflict has happend.
+#define re_hash_map_set_flnvh(HASH_MAP, CAPACITY, NEW_BUCKET, VALUE, KEY, HASH_FUNC, first, last, next, value, hash) ({ \
+        b8_t collision_happened = false; \
+        u64_t _hash = HASH_FUNC(KEY); \
+        u32_t index = _hash % (CAPACITY); \
+        __typeof__(*HASH_MAP) *bucket = &(HASH_MAP)[index]; \
+        if (bucket->first == NULL) { \
+            bucket->first = bucket->last = bucket; \
+            bucket->value = (VALUE); \
+            bucket->hash = _hash; \
+        } else { \
+            for (__typeof__(*HASH_MAP) *curr = bucket->first; curr != NULL; curr = curr->next) { \
+                if (curr->hash == _hash) { \
+                    curr->value = (VALUE); \
+                    break; \
+                } else { \
+                    if (curr->next == NULL) { \
+                        curr->next = (NEW_BUCKET); \
+                        (NEW_BUCKET)->prev = curr; \
+                        curr = (NEW_BUCKET); \
+                        (NEW_BUCKET)->value = (VALUE); \
+                        (NEW_BUCKET)->hash = _hash; \
+                        collision_happened = true; \
+                        break; \
+                    } \
+                } \
+            } \
         } \
-        __typeof__(*(HT)->entries) *re_macro_var(entry) = NULL; \
-        _re_ht_get_entry(re_macro_var(new_entries), re_macro_var(new_cap), re_macro_var(old).hash, re_macro_var(entry)); \
-        *re_macro_var(entry) = re_macro_var(old); \
-    } \
-    re_free((HT)->entries); \
-    (HT)->entries = re_macro_var(new_entries); \
-    (HT)->capacity = re_macro_var(new_cap); \
-} while (0)
+        collision_happened; \
+    })
+#define re_hash_map_set(HASH_MAP, CAPACITY, NEW_BUCKET, VALUE, KEY, HASH_FUNC) \
+    re_hash_map_set_flnvh(HASH_MAP, CAPACITY, NEW_BUCKET, VALUE, KEY, HASH_FUNC, first, last, next, value, hash)
 
-RE_API re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries, usize_t entry_count, usize_t alive_offset, usize_t stride);
-#define _re_ht_iter_next(HT, START) \
-    __re_ht_iter_next( \
-        (START), \
-        (HT)->entries, \
-        (HT)->capacity, \
-        re_offsetof(__typeof__(*(HT)->entries), alive), \
-        sizeof(__typeof__(*(HT)->entries)) \
-    )
+#define re_hash_map_get_fnv(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC, first, next, value) ({ \
+        __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_get_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
+        bucket == NULL ? (NULL_VALUE) : bucket->value; \
+    })
+#define re_hash_map_get(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC) \
+    re_hash_map_get_fnv(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC, first, next, value)
+
+#define re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next) ({ \
+        __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_has_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
+        bucket == NULL ? (NULL_VALUE) : bucket->value; \
+    })
+#define re_hash_map_has(HASH_MAP, CAPACITY, KEY, HASH_FUNC) \
+    re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next)
+
+#define re_hash_map_remove_flnph(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, last, next, prev, hash) ({ \
+        u64_t _hash = (HASH_FUNC)(KEY); \
+        u32_t index = _hash % (CAPACITY); \
+        __typeof__(*(HASH_MAP)) *bucket = &(HASH_MAP)[index]; \
+        for (__typeof__(*(HASH_MAP)) *curr = bucket->first; curr != NULL; curr = curr->next) { \
+            if (curr->hash == _hash) { \
+                if (curr->prev != NULL) { \
+                    curr->prev->next = curr->next; \
+                } \
+                if (curr->next != NULL) { \
+                    curr->next->prev = curr->prev; \
+                } \
+                if (curr == bucket->first) { \
+                    bucket->first = curr->next; \
+                } \
+                break; \
+            } \
+        } \
+    })
+#define re_hash_map_remove(HASH_MAP, CAPACITY, KEY, HASH_FUNC) \
+    re_hash_map_remove_flnph(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, last, next, prev, hash)
 
 /*=========================*/
 // Strings

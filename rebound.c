@@ -208,25 +208,6 @@ void re_format_string(char buffer[1024], const char *fmt, ...) {
 }
 
 /*=========================*/
-// Hash table
-/*=========================*/
-
-re_ht_iter_t __re_ht_iter_next(usize_t start, void *entries,
-        usize_t entry_count, usize_t alive_offset,
-        usize_t stride) {
-    for (usize_t i = start; i < entry_count; i++) {
-        u8_t *entry = (u8_t *)entries + i * stride;
-        b8_t alive = *(entry + alive_offset);
-
-        if (alive) {
-            return i;
-        }
-    }
-
-    return entry_count;
-}
-
-/*=========================*/
 // Strings
 /*=========================*/
 

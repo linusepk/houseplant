@@ -11,9 +11,6 @@ i32_t main(void) {
     re_log_info("----- DYNAMIC ARRAY -----");
     test_da();
 
-    re_log_info("----- HASH TABLE -----");
-    test_ht();
-
     re_log_info("----- POOL -----");
     test_pool();
 
