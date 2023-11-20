@@ -324,8 +324,8 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
     re_hash_map_get_fnv(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC, first, next, value)
 
 #define re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next) ({ \
-        __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_has_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
-        bucket == NULL; \
+        __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_get_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
+        bucket != NULL; \
     })
 #define re_hash_map_has(HASH_MAP, CAPACITY, KEY, HASH_FUNC) \
     re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next)
