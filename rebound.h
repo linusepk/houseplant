@@ -300,6 +300,9 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
                     break; \
                 } else { \
                     if (curr->next == NULL) { \
+                        if (curr == bucket->last) { \
+                            bucket->last = (NEW_BUCKET); \
+                        } \
                         curr->next = (NEW_BUCKET); \
                         (NEW_BUCKET)->prev = curr; \
                         curr = (NEW_BUCKET); \
@@ -313,22 +316,16 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
         } \
         collision_happened; \
     })
-#define re_hash_map_set(HASH_MAP, CAPACITY, NEW_BUCKET, VALUE, KEY, HASH_FUNC) \
-    re_hash_map_set_flnvh(HASH_MAP, CAPACITY, NEW_BUCKET, VALUE, KEY, HASH_FUNC, first, last, next, value, hash)
 
 #define re_hash_map_get_fnv(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC, first, next, value) ({ \
         __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_get_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
         bucket == NULL ? (NULL_VALUE) : bucket->value; \
     })
-#define re_hash_map_get(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC) \
-    re_hash_map_get_fnv(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC, first, next, value)
 
 #define re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next) ({ \
         __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_get_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
         bucket != NULL; \
     })
-#define re_hash_map_has(HASH_MAP, CAPACITY, KEY, HASH_FUNC) \
-    re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next)
 
 #define re_hash_map_remove_flnph(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, last, next, prev, hash) ({ \
         u64_t _hash = (HASH_FUNC)(KEY); \
@@ -345,12 +342,57 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
                 if (curr == bucket->first) { \
                     bucket->first = curr->next; \
                 } \
+                if (curr == bucket->last) { \
+                    bucket->last = curr->prev; \
+                } \
                 break; \
             } \
         } \
     })
-#define re_hash_map_remove(HASH_MAP, CAPACITY, KEY, HASH_FUNC) \
-    re_hash_map_remove_flnph(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, last, next, prev, hash)
+
+#define re_hash_map_t(KEY, VALUE) struct { \
+    re_arena_t *arena; \
+    struct re_macro_var(VALUE##_bucket_t) { \
+        struct re_macro_var(VALUE##_bucket_t) *first; \
+        struct re_macro_var(VALUE##_bucket_t) *last; \
+        struct re_macro_var(VALUE##_bucket_t) *next; \
+        struct re_macro_var(VALUE##_bucket_t) *prev; \
+        VALUE value; \
+        u64_t hash; \
+    } *buckets; \
+    u32_t bucket_count; \
+    struct re_macro_var(VALUE##_bucket_t) *backup; \
+    u64_t (*hash_func)(KEY); \
+    VALUE null_value; \
+}
+
+#define re_hash_map_create(MAP, COUNT, NULL_VALUE, HASH_FUNC, ARENA) do { \
+    (MAP).arena = (ARENA); \
+    (MAP).buckets = re_arena_push((ARENA), (COUNT) * sizeof(*((MAP).buckets))); \
+    (MAP).bucket_count = (COUNT); \
+    (MAP).backup = re_arena_push((ARENA), sizeof(*((MAP).buckets))); \
+    (MAP).hash_func = (HASH_FUNC); \
+    (MAP).null_value = (NULL_VALUE); \
+} while (0)
+
+#define re_hash_map_set(MAP, KEY, VALUE) ({ \
+        b8_t collision = false; \
+        if (re_hash_map_set_flnvh((MAP).buckets, (MAP).bucket_count, (MAP).backup, (VALUE), (KEY), map.hash_func), first, last, next, value, hash) { \
+            map.backup = re_arena_push((MAP).arena, sizeof(*((MAP).buckets))); \
+            collision = true; \
+        } \
+        collision; \
+    })
+
+#define re_hash_map_get(MAP, KEY) \
+    re_hash_map_get_fnv((MAP).buckets, (MAP).bucket_count, (MAP).null_value, (KEY), map.hash_func, first, next, value);
+
+#define hash_map_has(MAP, KEY) \
+    re_hash_map_has_fn((MAP).buckets, (MAP).bucket_count, (KEY), map.hash_func, first, next);
+
+#define re_hash_map_remove(MAP, KEY) \
+    re_hash_map_remove_flnph((MAP).buckets, (MAP).bucket_count, (KEY), map.hash_func, first, last, next, prev, hash);
+
 
 /*=========================*/
 // Strings
