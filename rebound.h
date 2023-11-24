@@ -377,7 +377,7 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
 
 #define re_hash_map_set(MAP, KEY, VALUE) ({ \
         b8_t collision = false; \
-        if (re_hash_map_set_flnvh((MAP).buckets, (MAP).bucket_count, (MAP).backup, (VALUE), (KEY), map.hash_func), first, last, next, value, hash) { \
+        if (re_hash_map_set_flnvh((MAP).buckets, (MAP).bucket_count, (MAP).backup, (VALUE), (KEY), map.hash_func, first, last, next, value, hash)) { \
             map.backup = re_arena_push((MAP).arena, sizeof(*((MAP).buckets))); \
             collision = true; \
         } \
