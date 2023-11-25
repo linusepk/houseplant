@@ -269,130 +269,116 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
 // Hash map
 /*=========================*/
 
-#define _re_hash_map_get_bucket_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next) ({ \
-        __typeof__(*(HASH_MAP)) *result = NULL; \
-        u64_t _hash = HASH_FUNC(KEY); \
-        u32_t index = _hash % (CAPACITY); \
-        __typeof__(*(HASH_MAP)) *bucket = &(HASH_MAP)[index]; \
-        for (__typeof__(*(HASH_MAP)) *curr = bucket->first; curr != NULL; curr = curr->next) { \
-            if (curr->hash == _hash) { \
-                result = curr; \
-                break; \
-            } \
-        } \
-        result; \
-    })
-
-// Returns true if a conflict has happend.
-#define re_hash_map_set_flnvh(HASH_MAP, CAPACITY, NEW_BUCKET, VALUE, KEY, HASH_FUNC, first, last, next, value, hash) ({ \
-        b8_t collision_happened = false; \
-        u64_t _hash = HASH_FUNC(KEY); \
-        u32_t index = _hash % (CAPACITY); \
-        __typeof__(*HASH_MAP) *bucket = &(HASH_MAP)[index]; \
-        if (bucket->first == NULL) { \
-            bucket->first = bucket->last = bucket; \
-            bucket->value = (VALUE); \
-            bucket->hash = _hash; \
-        } else { \
-            for (__typeof__(*HASH_MAP) *curr = bucket->first; curr != NULL; curr = curr->next) { \
-                if (curr->hash == _hash) { \
-                    curr->value = (VALUE); \
-                    break; \
-                } else { \
-                    if (curr->next == NULL) { \
-                        if (curr == bucket->last) { \
-                            bucket->last = (NEW_BUCKET); \
-                        } \
-                        curr->next = (NEW_BUCKET); \
-                        (NEW_BUCKET)->prev = curr; \
-                        curr = (NEW_BUCKET); \
-                        (NEW_BUCKET)->value = (VALUE); \
-                        (NEW_BUCKET)->hash = _hash; \
-                        collision_happened = true; \
-                        break; \
-                    } \
-                } \
-            } \
-        } \
-        collision_happened; \
-    })
-
-#define re_hash_map_get_fnv(HASH_MAP, CAPACITY, NULL_VALUE, KEY, HASH_FUNC, first, next, value) ({ \
-        __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_get_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
-        bucket == NULL ? (NULL_VALUE) : bucket->value; \
-    })
-
-#define re_hash_map_has_fn(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, next) ({ \
-        __typeof__(*(HASH_MAP)) *bucket = _re_hash_map_get_bucket_fn((HASH_MAP), (CAPACITY), (KEY), (HASH_FUNC), first, next); \
-        bucket != NULL; \
-    })
-
-#define re_hash_map_remove_flnph(HASH_MAP, CAPACITY, KEY, HASH_FUNC, first, last, next, prev, hash) ({ \
-        u64_t _hash = (HASH_FUNC)(KEY); \
-        u32_t index = _hash % (CAPACITY); \
-        __typeof__(*(HASH_MAP)) *bucket = &(HASH_MAP)[index]; \
-        for (__typeof__(*(HASH_MAP)) *curr = bucket->first; curr != NULL; curr = curr->next) { \
-            if (curr->hash == _hash) { \
-                if (curr->prev != NULL) { \
-                    curr->prev->next = curr->next; \
-                } \
-                if (curr->next != NULL) { \
-                    curr->next->prev = curr->prev; \
-                } \
-                if (curr == bucket->first) { \
-                    bucket->first = curr->next; \
-                } \
-                if (curr == bucket->last) { \
-                    bucket->last = curr->prev; \
-                } \
-                break; \
-            } \
-        } \
-    })
+#define _RE_HASH_MAP_INIT_CAP 8
+#define _RE_HASH_MAP_MAX_FILL 0.75f
+#define _RE_HASH_MAP_GROW_FACTOR 2
 
 #define re_hash_map_t(KEY, VALUE) struct { \
-    re_arena_t *arena; \
-    struct re_macro_var(VALUE##_bucket_t) { \
-        struct re_macro_var(VALUE##_bucket_t) *first; \
-        struct re_macro_var(VALUE##_bucket_t) *last; \
-        struct re_macro_var(VALUE##_bucket_t) *next; \
-        struct re_macro_var(VALUE##_bucket_t) *prev; \
+    struct { \
         VALUE value; \
+        b8_t in_use; \
         u64_t hash; \
     } *buckets; \
-    u32_t bucket_count; \
-    struct re_macro_var(VALUE##_bucket_t) *backup; \
+    u32_t count; \
+    u32_t capacity; \
     u64_t (*hash_func)(KEY); \
     VALUE null_value; \
-}
+} *
 
-#define re_hash_map_create(MAP, COUNT, NULL_VALUE, HASH_FUNC, ARENA) do { \
-    (MAP).arena = (ARENA); \
-    (MAP).buckets = re_arena_push((ARENA), (COUNT) * sizeof(*((MAP).buckets))); \
-    (MAP).bucket_count = (COUNT); \
-    (MAP).backup = re_arena_push((ARENA), sizeof(*((MAP).buckets))); \
-    (MAP).hash_func = (HASH_FUNC); \
-    (MAP).null_value = (NULL_VALUE); \
+#define re_hash_map_create(MAP, NULL_VALUE, HASH_FUNC) do { \
+        (MAP) = re_malloc(sizeof(__typeof__(*(MAP)))); \
+        (MAP)->hash_func = (HASH_FUNC); \
+        (MAP)->capacity = _RE_HASH_MAP_INIT_CAP; \
+        (MAP)->buckets = re_malloc(_RE_HASH_MAP_INIT_CAP * sizeof(*((MAP)->buckets))); \
+        memset((MAP)->buckets, 0, _RE_HASH_MAP_INIT_CAP * sizeof(*((MAP)->buckets))); \
+    } while (0)
+
+#define re_hash_map_destroy(MAP) do { \
+    re_free((MAP)->buckets); \
+    re_free(MAP); \
+    (MAP) = NULL; \
 } while (0)
 
-#define re_hash_map_set(MAP, KEY, VALUE) ({ \
-        b8_t collision = false; \
-        if (re_hash_map_set_flnvh((MAP).buckets, (MAP).bucket_count, (MAP).backup, (VALUE), (KEY), map.hash_func, first, last, next, value, hash)) { \
-            map.backup = re_arena_push((MAP).arena, sizeof(*((MAP).buckets))); \
-            collision = true; \
+#define _re_hash_map_get_bucket(BUCKETS, CAPACITY, HASH) ({ \
+        __typeof__(BUCKETS) bucket = NULL; \
+        u32_t starting_index = (HASH) % (CAPACITY); \
+        if ((BUCKETS)[starting_index].in_use && (BUCKETS)[starting_index].hash == (HASH)) { \
+            bucket = &(BUCKETS)[starting_index]; \
+        } else { \
+            for (u32_t index = starting_index + 1; index != starting_index; index = (index + 1) % (CAPACITY)) { \
+                if ((BUCKETS)[index].in_use && (BUCKETS)[index].hash == (HASH)) { \
+                    bucket = &(BUCKETS)[index]; \
+                    break; \
+                } \
+            } \
         } \
+        bucket; \
+    })
+
+#define _re_hash_map_get_free_bucket(BUCKETS, CAPACITY, HASH, COLLISION) ({ \
+        u32_t starting_index = (HASH) % (CAPACITY); \
+        __typeof__(BUCKETS) bucket = &(BUCKETS)[starting_index]; \
+        if (!bucket->in_use || bucket->hash == (HASH)) { \
+        } else {\
+            for (u32_t index = starting_index; true; index = (index + 1) % (CAPACITY)) { \
+                bucket = &(BUCKETS)[index]; \
+                if (!bucket->in_use || bucket->hash == (HASH)) { \
+                    (COLLISION) = (starting_index != index); \
+                    break; \
+                } \
+            } \
+        } \
+        bucket; \
+    }) \
+
+#define re_hash_map_set(MAP, KEY, VALUE) ({ \
+        if ((MAP)->count >= (MAP)->capacity * _RE_HASH_MAP_MAX_FILL) { \
+            u32_t new_capacity = (MAP)->capacity * _RE_HASH_MAP_GROW_FACTOR; \
+            __typeof__(((MAP)->buckets)) new_buckets = re_malloc(new_capacity * sizeof(__typeof__(*((MAP)->buckets)))); \
+            memset(new_buckets, 0, new_capacity * sizeof(__typeof__(*((MAP)->buckets)))); \
+            for (u32_t i = 0; i < (MAP)->capacity; i++) { \
+                __typeof__(*((MAP)->buckets)) old_bucket = (MAP)->buckets[i]; \
+                if (!old_bucket.in_use) { \
+                    continue; \
+                } \
+                b8_t temp; \
+                (void) temp; \
+                __typeof__(((MAP)->buckets)) new_bucket = _re_hash_map_get_free_bucket(new_buckets, new_capacity, old_bucket.hash, temp); \
+                *new_bucket = old_bucket; \
+            } \
+            (MAP)->buckets = new_buckets; \
+            (MAP)->capacity = new_capacity; \
+        } \
+        u64_t hash = (MAP)->hash_func(KEY); \
+        b8_t collision = false; \
+        \
+        __typeof__(((MAP)->buckets)) bucket = _re_hash_map_get_free_bucket((MAP)->buckets, (MAP)->capacity, hash, collision); \
+        bucket->hash = hash; \
+        bucket->in_use = true; \
+        bucket->value = (VALUE); \
+        \
+        (MAP)->count++; \
         collision; \
     })
 
-#define re_hash_map_get(MAP, KEY) \
-    re_hash_map_get_fnv((MAP).buckets, (MAP).bucket_count, (MAP).null_value, (KEY), map.hash_func, first, next, value);
+#define re_hash_map_remove(MAP, KEY) ({ \
+        __typeof__((MAP)->null_value) value = (MAP)->null_value; \
+        __typeof__((MAP)->buckets) bucket = _re_hash_map_get_bucket((MAP)->buckets, (MAP)->capacity, (MAP)->hash_func(KEY)); \
+        if (bucket != NULL) { \
+            (MAP)->count--; \
+            bucket->in_use = false; \
+        } \
+        value; \
+    })
 
-#define hash_map_has(MAP, KEY) \
-    re_hash_map_has_fn((MAP).buckets, (MAP).bucket_count, (KEY), map.hash_func, first, next);
+#define re_hash_map_get(MAP, KEY) ({ \
+        __typeof__((MAP)->buckets) bucket = _re_hash_map_get_bucket((MAP)->buckets, (MAP)->capacity, (MAP)->hash_func(KEY)); \
+        bucket != NULL ? bucket->value : (MAP)->null_value; \
+    })
 
-#define re_hash_map_remove(MAP, KEY) \
-    re_hash_map_remove_flnph((MAP).buckets, (MAP).bucket_count, (KEY), map.hash_func, first, last, next, prev, hash);
-
+#define re_hash_map_has(MAP, KEY) ({ \
+        _re_hash_map_get_bucket((MAP)->buckets, (MAP)->capacity, (MAP)->hash_func(KEY)) != NULL; \
+    })
 
 /*=========================*/
 // Strings
