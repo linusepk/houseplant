@@ -269,116 +269,78 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
 // Hash map
 /*=========================*/
 
-#define _RE_HASH_MAP_INIT_CAP 8
-#define _RE_HASH_MAP_MAX_FILL 0.75f
-#define _RE_HASH_MAP_GROW_FACTOR 2
-
 #define re_hash_map_t(KEY, VALUE) struct { \
-    struct { \
+    re_arena_t *arena; \
+    struct re_macro_var(slot) { \
+        struct re_macro_var(slot) *child[4]; \
+        KEY key; \
         VALUE value; \
-        b8_t in_use; \
-        u64_t hash; \
-    } *buckets; \
-    u32_t count; \
-    u32_t capacity; \
+    } *slots[4]; \
     u64_t (*hash_func)(KEY); \
+    b8_t (*equal_func)(KEY, KEY); \
     VALUE null_value; \
 } *
 
-#define re_hash_map_create(MAP, NULL_VALUE, HASH_FUNC) do { \
-        (MAP) = re_malloc(sizeof(__typeof__(*(MAP)))); \
-        (MAP)->hash_func = (HASH_FUNC); \
-        (MAP)->capacity = _RE_HASH_MAP_INIT_CAP; \
-        (MAP)->buckets = re_malloc(_RE_HASH_MAP_INIT_CAP * sizeof(*((MAP)->buckets))); \
+/* void re_hash_map_create(re_hash_map_t(key_t, value_t) map, */
+/*                         value_t null_value, */
+/*                         u64_t (*hash_func)(key_t key), */
+/*                         b8_t (*equal_func)(key_t a, key_t b)); */
+#define re_hash_map_create(MAP, NULL_VALUE, HASH_FUNC, EQUAL_FUNC, ARENA) ({ \
+        (MAP) = re_arena_push_zero(arena, sizeof(*(MAP))); \
         (MAP)->null_value = (NULL_VALUE); \
-        memset((MAP)->buckets, 0, _RE_HASH_MAP_INIT_CAP * sizeof(*((MAP)->buckets))); \
-    } while (0)
-
-#define re_hash_map_destroy(MAP) do { \
-    re_free((MAP)->buckets); \
-    re_free(MAP); \
-    (MAP) = NULL; \
-} while (0)
-
-#define _re_hash_map_get_bucket(BUCKETS, CAPACITY, HASH) ({ \
-        __typeof__(BUCKETS) bucket = NULL; \
-        u32_t starting_index = (HASH) % (CAPACITY); \
-        if ((BUCKETS)[starting_index].in_use && (BUCKETS)[starting_index].hash == (HASH)) { \
-            bucket = &(BUCKETS)[starting_index]; \
-        } else { \
-            for (u32_t index = starting_index + 1; index != starting_index; index = (index + 1) % (CAPACITY)) { \
-                if ((BUCKETS)[index].in_use && (BUCKETS)[index].hash == (HASH)) { \
-                    bucket = &(BUCKETS)[index]; \
-                    break; \
-                } \
-            } \
-        } \
-        bucket; \
+        (MAP)->hash_func = (HASH_FUNC); \
+        (MAP)->equal_func = (EQUAL_FUNC); \
+        (MAP)->arena = (ARENA); \
     })
 
-#define _re_hash_map_get_free_bucket(BUCKETS, CAPACITY, HASH, COLLISION) ({ \
-        u32_t starting_index = (HASH) % (CAPACITY); \
-        __typeof__(BUCKETS) bucket = &(BUCKETS)[starting_index]; \
-        if (!bucket->in_use || bucket->hash == (HASH)) { \
-        } else {\
-            for (u32_t index = starting_index; true; index = (index + 1) % (CAPACITY)) { \
-                bucket = &(BUCKETS)[index]; \
-                if (!bucket->in_use || bucket->hash == (HASH)) { \
-                    (COLLISION) = (starting_index != index); \
-                    break; \
-                } \
-            } \
-        } \
-        bucket; \
-    }) \
-
+/* void re_hash_map_set(re_hash_map_t(key_t, value_t) map, */
+/*                      key_t key, */
+/*                      value_t value); */
 #define re_hash_map_set(MAP, KEY, VALUE) ({ \
-        if ((MAP)->count >= (MAP)->capacity * _RE_HASH_MAP_MAX_FILL) { \
-            u32_t new_capacity = (MAP)->capacity * _RE_HASH_MAP_GROW_FACTOR; \
-            __typeof__(((MAP)->buckets)) new_buckets = re_malloc(new_capacity * sizeof(__typeof__(*((MAP)->buckets)))); \
-            memset(new_buckets, 0, new_capacity * sizeof(__typeof__(*((MAP)->buckets)))); \
-            for (u32_t i = 0; i < (MAP)->capacity; i++) { \
-                __typeof__(*((MAP)->buckets)) old_bucket = (MAP)->buckets[i]; \
-                if (!old_bucket.in_use) { \
-                    continue; \
-                } \
-                b8_t temp; \
-                (void) temp; \
-                __typeof__(((MAP)->buckets)) new_bucket = _re_hash_map_get_free_bucket(new_buckets, new_capacity, old_bucket.hash, temp); \
-                *new_bucket = old_bucket; \
-            } \
-            (MAP)->buckets = new_buckets; \
-            (MAP)->capacity = new_capacity; \
+        __typeof__(*(MAP)->slots) *slot = _re_hash_map_get_slot((MAP), (KEY)); \
+        if (*slot == NULL) { \
+            *slot = re_arena_push_zero((MAP)->arena, sizeof(**(MAP)->slots)); \
+            (*slot)->key = (KEY); \
         } \
-        u64_t hash = (MAP)->hash_func(KEY); \
-        b8_t collision = false; \
-        \
-        __typeof__(((MAP)->buckets)) bucket = _re_hash_map_get_free_bucket((MAP)->buckets, (MAP)->capacity, hash, collision); \
-        bucket->hash = hash; \
-        bucket->in_use = true; \
-        bucket->value = (VALUE); \
-        \
-        (MAP)->count++; \
-        collision; \
+        (*slot)->value = (VALUE); \
     })
 
+/* value_t re_hash_map_remove(re_hash_map_t(key_t, value_t) map, */
+/*                            key_t key); */
 #define re_hash_map_remove(MAP, KEY) ({ \
+        __typeof__(*(MAP)->slots) *slot = _re_hash_map_get_slot((MAP), (KEY)); \
         __typeof__((MAP)->null_value) value = (MAP)->null_value; \
-        __typeof__((MAP)->buckets) bucket = _re_hash_map_get_bucket((MAP)->buckets, (MAP)->capacity, (MAP)->hash_func(KEY)); \
-        if (bucket != NULL) { \
-            (MAP)->count--; \
-            bucket->in_use = false; \
+        if (*slot) { \
+            value = (*slot)->value; \
+            *slot = NULL; \
         } \
         value; \
     })
 
+/* value_t re_hash_map_get(re_hash_map_t(key_t, value_t) map, */
+/*                         key_t key); */
 #define re_hash_map_get(MAP, KEY) ({ \
-        __typeof__((MAP)->buckets) bucket = _re_hash_map_get_bucket((MAP)->buckets, (MAP)->capacity, (MAP)->hash_func(KEY)); \
-        bucket != NULL ? bucket->value : (MAP)->null_value; \
+        __typeof__(*(MAP)->slots) *slot = _re_hash_map_get_slot((MAP), (KEY)); \
+        *slot ? (*slot)->value : (MAP)->null_value; \
     })
 
+/* b8_t re_hash_map_has(re_hash_map_t(key_t, value_t) map, */
+/*                      key_t key); */
 #define re_hash_map_has(MAP, KEY) ({ \
-        _re_hash_map_get_bucket((MAP)->buckets, (MAP)->capacity, (MAP)->hash_func(KEY)) != NULL; \
+        *_re_hash_map_get_slot((MAP), (KEY)) != NULL; \
+    })
+
+#define _re_hash_map_get_slot(MAP, KEY) ({ \
+        u64_t hash = (MAP)->hash_func((KEY)); \
+        hash <<= 2; \
+        u8_t branch = hash >> 62; \
+        __typeof__(*(MAP)->slots) *slot = NULL; \
+        for (slot = &(MAP)->slots[branch]; *slot != NULL; slot = &(*slot)->child[branch]) { \
+            if ((MAP)->equal_func((KEY), (*slot)->key)) { \
+                break; \
+            } \
+        } \
+        slot; \
     })
 
 /*=========================*/
