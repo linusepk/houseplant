@@ -290,6 +290,7 @@ RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_
         (MAP)->hash_func = (HASH_FUNC); \
         (MAP)->capacity = _RE_HASH_MAP_INIT_CAP; \
         (MAP)->buckets = re_malloc(_RE_HASH_MAP_INIT_CAP * sizeof(*((MAP)->buckets))); \
+        (MAP)->null_value = (NULL_VALUE); \
         memset((MAP)->buckets, 0, _RE_HASH_MAP_INIT_CAP * sizeof(*((MAP)->buckets))); \
     } while (0)
 
