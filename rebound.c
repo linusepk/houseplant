@@ -191,10 +191,10 @@ void _re_arena_scratch_destroy(void) {
 // Utils
 /*=========================*/
 
-usize_t re_fvn1a_hash(const char *key, usize_t len) {
+u64_t re_fvn1a_hash(const void *data, u64_t size) {
     u32_t hash = 2166136261u;
-    for (u32_t i = 0; i < len; i++) {
-        hash ^= (u8_t)key[i];
+    for (u32_t i = 0; i < size; i++) {
+        hash ^= *(u8_t *)((ptr_t) data + i);
         hash *= 16777619;
     }
     return hash;
@@ -288,125 +288,142 @@ re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena) {
 // Dynamic array
 /*=========================*/
 
-#define _RE_DA_INIT_CAP 8
+#define _RE_DYN_ARR_INIT_CAP 8
 
-typedef struct _re_da_header_t _re_da_header_t;
-struct _re_da_header_t {
-    usize_t size;
-    usize_t count;
-    usize_t cap;
+typedef struct re_dyn_arr_head_t re_dyn_arr_head_t;
+struct re_dyn_arr_head_t {
+    u32_t capacity;
+    u32_t count;
+    u32_t size;
 };
 
-#define _re_da_to_head(DA) ((_re_da_header_t *) ((ptr_t) (DA) - sizeof(_re_da_header_t)))
-#define _re_head_to_da(HEAD) ((void *) ((ptr_t) (HEAD) + sizeof(_re_da_header_t)))
+#define head_from_re_dyn_arr(ARR)  ((ARR) ? (re_dyn_arr_head_t *) ((ptr_t) (ARR) - sizeof(re_dyn_arr_head_t)) : &_null_head)
+#define re_dyn_arr_from_head(HEAD) ((void *) ((ptr_t) (HEAD) + sizeof(re_dyn_arr_head_t)))
 
-void _re_da_resize(void **da, usize_t count) {
-    _re_da_header_t *head = _re_da_to_head(*da);
-    b8_t resize_needed = false;
-    if (head->count + count > head->cap) {
-        head->cap *= 2;
-        resize_needed = true;
-    }
+static re_dyn_arr_head_t _null_head = {0};
 
-    if (!resize_needed) {
+static void _re_dyn_arr_ensure(void **arr, u32_t count) {
+    re_dyn_arr_head_t *head = head_from_re_dyn_arr(*arr);
+    if (count <= head->capacity) {
         return;
     }
 
-    void *new_head =
-        re_realloc(head, sizeof(_re_da_header_t) + head->size * head->cap);
-    if (!new_head) {
-        *da = NULL;
+    while (count > head->capacity) {
+        head->capacity *= 2;
+    }
+    head = re_realloc(head, sizeof(re_dyn_arr_head_t) + head->capacity * head->size);
+    *arr = re_dyn_arr_from_head(head);
+}
+
+void _re_dyn_arr_new_impl(void **arr, u32_t size) {
+    if (*arr != NULL) {
         return;
     }
-    *da = _re_head_to_da(new_head);
+
+    re_dyn_arr_head_t *head = re_malloc(sizeof(re_dyn_arr_head_t) + size * _RE_DYN_ARR_INIT_CAP);
+    *head = (re_dyn_arr_head_t) {
+        .capacity = _RE_DYN_ARR_INIT_CAP,
+        .count = 0,
+        .size = size
+    };
+
+    *arr = re_dyn_arr_from_head(head);
 }
 
-void _re_da_create(void **da, usize_t size) {
-    usize_t total_size = sizeof(_re_da_header_t) + size * _RE_DA_INIT_CAP;
-    _re_da_header_t *head = re_malloc(total_size);
-    if (!head) {
-        *da = NULL;
+void _re_dyn_arr_free_impl(void **arr) {
+    if (*arr == NULL) {
         return;
     }
-    head->size = size;
-    head->count = 0;
-    head->cap = _RE_DA_INIT_CAP;
 
-    *da = _re_head_to_da(head);
+    re_free(head_from_re_dyn_arr(*arr));
+    *arr = NULL;
 }
 
-void _re_da_destroy(void **da) {
-    _re_da_header_t *head = _re_da_to_head(*da);
-    re_free(head);
-    *da = NULL;
+u32_t re_dyn_arr_count(void *arr) {
+    return head_from_re_dyn_arr(arr)->count;
 }
 
-void _re_da_insert_fast(void **da, const void *value, usize_t index) {
-    _re_da_resize(da, 1);
+void _re_dyn_arr_insert_fast_impl(void **arr, const void *value, u32_t index) {
+    re_dyn_arr_head_t *head = head_from_re_dyn_arr(*arr);
+    RE_ASSERT(index <= head->count, "Dyanmic array insertion out of bounds.");
 
-    _re_da_header_t *head = _re_da_to_head(*da);
-    index = re_clamp_max(index, head->count);
+    _re_dyn_arr_ensure(arr, head->count + 1);
+    head = head_from_re_dyn_arr(*arr);
 
-    ptr_t dest = (ptr_t) *da + head->count * head->size;
-    ptr_t source = (ptr_t) *da + index * head->size;
+    ptr_t wanted_pos = (ptr_t) *arr + index * head->size;
+    ptr_t new_pos = (ptr_t) *arr + head->count * head->size;
 
-    memmove(dest, source, head->size);
-    memcpy(source, value, head->size);
+    // Place old value at the back of the array.
+    memcpy(new_pos, wanted_pos, head->size);
+    // Place the new value at the index.
+    memcpy(wanted_pos, value, head->size);
 
     head->count++;
 }
 
-void _re_da_remove_fast(void **da, usize_t index, void *output) {
-    _re_da_header_t *head = _re_da_to_head(*da);
-    index = re_clamp_max(index, head->count - 1);
+void _re_dyn_arr_insert_arr_impl(void **arr, const void *value_arr, u32_t count, u32_t index) {
+    re_dyn_arr_head_t *head = head_from_re_dyn_arr(*arr);
+    RE_ASSERT(index <= head->count, "Dyanmic array insertion out of bounds.");
 
-    ptr_t dest = (ptr_t) *da + index * head->size;
-    ptr_t source = (ptr_t) *da + (head->count - 1) * head->size;
+    _re_dyn_arr_ensure(arr, head->count + count);
+    head = head_from_re_dyn_arr(*arr);
 
-    if (output != NULL) {
-        memcpy(output, dest, head->size);
-    }
-    memmove(dest, source, head->size);
+    ptr_t wanted_pos = (ptr_t) *arr + index * head->size;
+    ptr_t new_pos = (ptr_t) *arr + (index + count) * head->size;
 
-    head->count--;
-}
+    //     V   V
+    // 0 1 2 3 4 5 6 7 8 9
 
-void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index) {
-    _re_da_resize(da, count);
-
-    _re_da_header_t *head = _re_da_to_head(*da);
-    index = re_clamp_max(index, head->count);
-
-    ptr_t dest = (ptr_t) *da + (index + count) * head->size;
-    ptr_t source = (ptr_t) *da + index * head->size;
-
-    memmove(dest, source, (head->count - index) * head->size);
-    if (arr == NULL) {
-        memset(source, 0, count * head->size);
+    // Move old values to make room for the new array.
+    memmove(new_pos, wanted_pos, (head->count - index) * head->size);
+    // Place the new array of value in the array.
+    if (value_arr != NULL) {
+        memcpy(wanted_pos, value_arr, count * head->size);
     } else {
-        memcpy(source, arr, count * head->size);
+        memset(wanted_pos, 0, count * head->size);
     }
 
     head->count += count;
 }
 
-void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output) {
-    _re_da_header_t *head = _re_da_to_head(*da);
-    index = re_clamp_max(index, head->count - count);
+void _re_dyn_arr_remove_fast_impl(void **arr, u32_t index, void *result) {
+    re_dyn_arr_head_t *head = head_from_re_dyn_arr(*arr);
+    RE_ASSERT(index < head->count, "Dyanmic array removal out of bounds.");
 
-    ptr_t dest = (ptr_t) *da + index * head->size;
-    ptr_t source = (ptr_t) *da + (index + count) * head->size;
+    ptr_t end_pos = (ptr_t) *arr + (head->count - 1) * head->size;
+    ptr_t gap_pos = (ptr_t) *arr + index * head->size;
 
-    if (output != NULL) {
-        memcpy(output, dest, count * head->size);
+    memcpy(result, gap_pos, head->size);
+    memcpy(gap_pos, end_pos, head->size);
+
+    head->count--;
+}
+
+void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, void *out) {
+    re_dyn_arr_head_t *head = head_from_re_dyn_arr(*arr);
+    RE_ASSERT(index < head->count && count <= head->count && index + count <= head->count, "Dyanmic array removal range out of bounds.");
+
+    ptr_t begin_pos = (ptr_t) *arr + index * head->size;
+    ptr_t end_pos = (ptr_t) *arr + (index + count) * head->size;
+
+    //     V     V
+    // 0 1 2 3 4 5 6 7 8 9
+
+    if (out != NULL) {
+        memcpy(out, begin_pos, count * head->size);
     }
-    memmove(dest, source, (head->count - index - count) * head->size);
+
+    memmove(begin_pos, end_pos, (head->count - index - count) * head->size);
 
     head->count -= count;
 }
 
-usize_t _re_da_count(void *da) {
-    return _re_da_to_head(da)->count;
+/*=========================*/
+// Hash map
+/*=========================*/
+
+b8_t _re_hash_map_default_equal_func(const void *a, const void *b, u32_t size) {
+    return memcmp(a, b, size) == 0;
 }
 
 /*=========================*/
@@ -1222,3 +1239,229 @@ void re_os_mem_release(void *ptr, usize_t size) {
 
 #ifdef RE_OS_WINDOWS
 #endif
+
+#ifdef RE_UNIT_TESTS
+
+void re_dyn_arr_unit_test(void) {
+    re_dyn_arr_t(i32_t) arr = NULL;
+    i32_t data[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+
+    {
+        i32_t expected[8] = {0, 1, 2, 3, 4, 5, 6, 7};
+
+        for (u32_t i = 0; i < 8; i++) {
+            re_dyn_arr_push(arr, i);
+        }
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 8, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(arr, expected, sizeof(expected)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+
+        RE_ENSURE(arr == NULL, "Dynamic array not freed properly.");
+    }
+
+    {
+        i32_t expected[8] = {7, 6, 5, 4, 3, 2, 1, 0};
+
+        for (u32_t i = 0; i < 8; i++) {
+            re_dyn_arr_insert(arr, i, 0);
+        }
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 8, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(arr, expected, sizeof(expected)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        i32_t expected[8] = {7, 0, 1, 2, 3, 4, 5, 6};
+
+        for (u32_t i = 0; i < 8; i++) {
+            re_dyn_arr_insert_fast(arr, i, 0);
+        }
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 8, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(arr, expected, sizeof(expected)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        i32_t expected[8] = {4, 5, 6, 7, 0, 1, 2, 3};
+
+        re_dyn_arr_push_arr(arr, &data[4], 4);
+        re_dyn_arr_push_arr(arr, data, 4);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 8, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(arr, expected, sizeof(expected)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        i32_t expected[8] = {0, 4, 5, 6, 7, 1, 2, 3};
+
+        re_dyn_arr_insert_arr(arr, data, 4, 0);
+        re_dyn_arr_insert_arr(arr, &data[4], 4, 1);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 8, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(arr, expected, sizeof(expected)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        i32_t expected[4] = {0, 0, 0, 0};
+
+        re_dyn_arr_reserve(arr, 4);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 4, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(arr, expected, sizeof(expected)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        re_dyn_arr_push_arr(arr, data, 8);
+
+        i32_t expected_value = 7;
+        i32_t expected_arr[7] = {0, 1, 2, 3, 4, 5, 6};
+
+        i32_t value = re_dyn_arr_pop(arr);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 7, "re_dyn_arr_count not matching.");
+        RE_ENSURE(value == expected_value, "Value not matching.");
+        RE_ENSURE(memcmp(arr, expected_arr, sizeof(expected_arr)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        re_dyn_arr_push_arr(arr, data, 8);
+
+        i32_t expected_value = 1;
+        i32_t expected_arr[7] = {0, 2, 3, 4, 5, 6, 7};
+
+        i32_t value = re_dyn_arr_remove(arr, 1);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 7, "re_dyn_arr_count not matching.");
+        RE_ENSURE(value == expected_value, "Value not matching.");
+        RE_ENSURE(memcmp(arr, expected_arr, sizeof(expected_arr)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        re_dyn_arr_push_arr(arr, data, 8);
+
+        i32_t expected_value = 1;
+        i32_t expected_arr[7] = {0, 7, 2, 3, 4, 5, 6};
+
+        i32_t value = re_dyn_arr_remove_fast(arr, 1);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 7, "re_dyn_arr_count not matching.");
+        RE_ENSURE(value == expected_value, "Value not matching.");
+        RE_ENSURE(memcmp(arr, expected_arr, sizeof(expected_arr)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        re_dyn_arr_push_arr(arr, data, 8);
+
+        i32_t expected_result_arr[4] = {4, 5, 6, 7};
+        i32_t expected_arr[4] = {0, 1, 2, 3};
+
+        i32_t result_arr[4] = {0};
+        re_dyn_arr_pop_arr(arr, 4, result_arr);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 4, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(result_arr, expected_result_arr, sizeof(expected_result_arr)) == 0, "Value not matching.");
+        RE_ENSURE(memcmp(arr, expected_arr, sizeof(expected_arr)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+
+    {
+        re_dyn_arr_push_arr(arr, data, 8);
+
+        i32_t expected_result_arr[4] = {0, 1, 2, 3};
+        i32_t expected_arr[4] = {4, 5, 6, 7};
+
+        i32_t result_arr[4] = {0};
+        re_dyn_arr_remove_arr(arr, 4, 0, result_arr);
+
+        RE_ENSURE(re_dyn_arr_count(arr) == 4, "re_dyn_arr_count not matching.");
+        RE_ENSURE(memcmp(result_arr, expected_result_arr, sizeof(expected_result_arr)) == 0, "Value not matching.");
+        RE_ENSURE(memcmp(arr, expected_arr, sizeof(expected_arr)) == 0, "Array's don't match.");
+
+        re_dyn_arr_free(arr);
+    }
+}
+
+static u64_t iter_hash(const void *a, u32_t size) {
+    (void) size;
+
+    return *(i32_t *) a;
+}
+
+void re_hash_map_unit_test(void) {
+    re_hash_map_t(i32_t, const char *) re_hash_map = NULL;
+
+    {
+        re_hash_map_set(re_hash_map, 42, "foo");
+        const char *value = re_hash_map_get(re_hash_map, 42);
+        RE_ENSURE(re_hash_map_count(re_hash_map) == 1, "Count not matching.");
+        RE_ENSURE(strcmp(value, "foo") == 0, "Values don't match.");
+        RE_ENSURE(re_hash_map_has(re_hash_map, 42) == true, "Can't find an accurate value.");
+
+        value = re_hash_map_remove(re_hash_map, 42);
+        RE_ENSURE(strcmp(value, "foo") == 0, "Values don't match.");
+        value = re_hash_map_remove(re_hash_map, 42);
+        RE_ENSURE(value == NULL, "Values don't match.");
+    }
+
+    {
+        re_hash_map_set(re_hash_map, 42, "foo");
+        i32_t index = 7;
+
+        const char *value = re_hash_map_get_index_value(re_hash_map, index);
+        RE_ENSURE(strcmp(value, "foo") == 0, "Value at index 7 doesn't match.");
+        i32_t key = re_hash_map_get_index_key(re_hash_map, index);
+        RE_ENSURE(key == 42, "Key at index 7 doesn't match.");
+
+        value = re_hash_map_get_index_value(re_hash_map, 0);
+        RE_ENSURE(value == NULL, "Value at index 0 not expected.");
+        key = re_hash_map_get_index_key(re_hash_map, 0);
+        RE_ENSURE(key == 0, "Key at index 0 not expected.");
+    }
+
+    {
+        re_hash_map_t(i32_t, f32_t) iter_map = NULL;
+        re_hash_map_init(iter_map, 0, 0.0f, iter_hash, _re_hash_map_default_equal_func);
+
+        for (u32_t i = 0; i < 64; i++) {
+            re_hash_map_set(iter_map, i, (f32_t) i / 100.0f);
+        }
+
+        f32_t values[64];
+        f32_t *curr_value = values;
+        for (re_hash_map_iter_t iter = re_hash_map_iter_get(iter_map);
+            re_hash_map_iter_valid(iter);
+            iter = re_hash_map_iter_next(iter_map, iter)) {
+            *curr_value++ = re_hash_map_get_index_value(iter_map, iter);
+        }
+
+        for (u32_t i = 0; i < re_arr_len(values); i++) {
+            RE_ENSURE(values[i] == i / 100.0f, "Values don't match.");
+        }
+
+        re_hash_map_free(iter_map);
+    }
+
+    re_hash_map_free(re_hash_map);
+    RE_ENSURE(re_hash_map == NULL, "Hash map not freed properly.");
+}
+
+#endif // RE_UNIT_TESTS

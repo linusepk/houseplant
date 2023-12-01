@@ -199,7 +199,8 @@ RE_API void _re_arena_scratch_destroy(void);
 #define RE_ASSERT(cond, ...)
 #endif
 
-typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
+typedef u64_t (*re_hash_func_t)(const void *data, u64_t size);
+typedef b8_t (*re_equal_func_t)(const void *a, const void *b, u32_t size);
 
 // Concatinates A and B into an identifier.
 #define re_concat(A, B) _re_concat(A, B)
@@ -261,87 +262,9 @@ typedef usize_t (*re_hash_func_t)(const void *data, usize_t size);
     (M) >> (N) & 1
 
 // Hashes data using the fvn1a algorithm.
-RE_API usize_t re_fvn1a_hash(const char *key, usize_t len);
+RE_API u64_t re_fvn1a_hash(const void *data, u64_t size);
 // Formats the fmt string into the provided buffer.
 RE_API void re_format_string(char buffer[1024], const char *fmt, ...) RE_FORMAT_FUNCTION(2, 3);
-
-/*=========================*/
-// Hash map
-/*=========================*/
-
-#define re_hash_map_t(KEY, VALUE) struct { \
-    re_arena_t *arena; \
-    struct re_macro_var(slot) { \
-        struct re_macro_var(slot) *child[4]; \
-        KEY key; \
-        VALUE value; \
-    } *slots[4]; \
-    u64_t (*hash_func)(KEY); \
-    b8_t (*equal_func)(KEY, KEY); \
-    VALUE null_value; \
-} *
-
-/* void re_hash_map_create(re_hash_map_t(key_t, value_t) map, */
-/*                         value_t null_value, */
-/*                         u64_t (*hash_func)(key_t key), */
-/*                         b8_t (*equal_func)(key_t a, key_t b)); */
-#define re_hash_map_create(MAP, NULL_VALUE, HASH_FUNC, EQUAL_FUNC, ARENA) ({ \
-        (MAP) = re_arena_push_zero(arena, sizeof(*(MAP))); \
-        (MAP)->null_value = (NULL_VALUE); \
-        (MAP)->hash_func = (HASH_FUNC); \
-        (MAP)->equal_func = (EQUAL_FUNC); \
-        (MAP)->arena = (ARENA); \
-    })
-
-/* void re_hash_map_set(re_hash_map_t(key_t, value_t) map, */
-/*                      key_t key, */
-/*                      value_t value); */
-#define re_hash_map_set(MAP, KEY, VALUE) ({ \
-        __typeof__(*(MAP)->slots) *slot = _re_hash_map_get_slot((MAP), (KEY)); \
-        if (*slot == NULL) { \
-            *slot = re_arena_push_zero((MAP)->arena, sizeof(**(MAP)->slots)); \
-            (*slot)->key = (KEY); \
-        } \
-        (*slot)->value = (VALUE); \
-    })
-
-/* value_t re_hash_map_remove(re_hash_map_t(key_t, value_t) map, */
-/*                            key_t key); */
-#define re_hash_map_remove(MAP, KEY) ({ \
-        __typeof__(*(MAP)->slots) *slot = _re_hash_map_get_slot((MAP), (KEY)); \
-        __typeof__((MAP)->null_value) value = (MAP)->null_value; \
-        if (*slot) { \
-            value = (*slot)->value; \
-            *slot = NULL; \
-        } \
-        value; \
-    })
-
-/* value_t re_hash_map_get(re_hash_map_t(key_t, value_t) map, */
-/*                         key_t key); */
-#define re_hash_map_get(MAP, KEY) ({ \
-        __typeof__(*(MAP)->slots) *slot = _re_hash_map_get_slot((MAP), (KEY)); \
-        *slot ? (*slot)->value : (MAP)->null_value; \
-    })
-
-/* b8_t re_hash_map_has(re_hash_map_t(key_t, value_t) map, */
-/*                      key_t key); */
-#define re_hash_map_has(MAP, KEY) ({ \
-        *_re_hash_map_get_slot((MAP), (KEY)) != NULL; \
-    })
-
-#define _re_hash_map_get_slot(MAP, KEY) ({ \
-        u64_t hash = (MAP)->hash_func((KEY)); \
-        hash <<= 2; \
-        u8_t branch = hash >> 62; \
-        __typeof__(*(MAP)->slots) *slot = NULL; \
-        for (slot = &(MAP)->slots[branch]; *slot != NULL; slot = &(*slot)->child[branch]) { \
-            if ((MAP)->equal_func((KEY), (*slot)->key)) { \
-                break; \
-            } \
-        } \
-        slot; \
-    })
 
 /*=========================*/
 // Strings
@@ -440,67 +363,283 @@ RE_API re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena);
 // Dynamic array
 /*=========================*/
 
-// Declares a new dynamic array.
-// Use this instead of 'i32_t *dyn_arr;' to make it easier to identify dynamic arrays.
-#define re_da_t(T) T *
+#define re_dyn_arr_t(T) T *
 
-// Initializes the dynamic array.
-#define re_da_create(DA) _re_da_create((void **) &(DA), sizeof(*(DA)))
-// Frees all memory used by dynamic array and sets DA to NULL.
-#define re_da_destroy(DA) _re_da_destroy((void **) &(DA))
+#define re_dyn_arr_new(ARR, SIZE) \
+    _re_dyn_arr_new_impl((void **) &(ARR), (SIZE))
 
-// Insert value into dynamic array at a certain index preserving the order of items.
-#define re_da_insert(DA, VALUE, INDEX) do { \
-    __typeof__(*DA) re_macro_var(temp_value) = (VALUE); \
-    _re_da_insert_arr((void **) &(DA), &re_macro_var(temp_value), 1, (INDEX)); \
-} while (0)
-// Removes value from dynamic array at a certain index preserving the order of items.
-// If OUT is not NULL the removed values will be copied to it.
-#define re_da_remove(DA, INDEX, OUT) _re_da_remove_arr((void **) &(DA), 1, (INDEX), OUT)
+#define re_dyn_arr_free(ARR) \
+    _re_dyn_arr_free_impl((void **) &(ARR))
 
-// Inserts value into dynamic array by swapping the value at INDEX to the last position and replacing it with VALUE.
-#define re_da_insert_fast(DA, VALUE, INDEX) do { \
-    __typeof__(*DA) re_macro_var(temp_value) = (VALUE); \
-    _re_da_insert_fast((void **) &(DA), &re_macro_var(temp_value), (INDEX)); \
-} while (0)
-// Removes value at INDEX by replace the value with the last value. 
-// If OUT is not NULL the removed values will be copied to it.
-#define re_da_remove_fast(DA, INDEX, OUT) _re_da_remove_fast((void **) &(DA), (INDEX), OUT)
+u32_t re_dyn_arr_count(void *arr);
 
-// Pushes VALUE to the back of the dynamic array.
-#define re_da_push(DA, VALUE) re_da_insert_fast(DA, VALUE, re_da_count(DA));
-// Removes the last value from the dynamic array.
-// If OUT is not NULL the removed values will be copied to it.
-#define re_da_pop(DA, OUT) re_da_remove_fast(DA, re_da_count(DA) - 1, OUT)
+#define re_dyn_arr_last(ARR) ((ARR)[re_dyn_arr_count(ARR) - 1])
 
-// Inserts an entire array into the dynamic array.
-#define re_da_insert_arr(DA, ARR, COUNT, INDEX) _re_da_insert_arr((void **) &(DA), (ARR), (COUNT), (INDEX))
-// Removes COUNT elements from dyanmic array.
-// If OUT is not NULL the removed values will be copied to it.
-#define re_da_remove_arr(DA, COUNT, INDEX, OUT) _re_da_remove_arr((void **) &(DA), (COUNT), (INDEX), (OUT))
+// Iterations
+#define re_dyn_arr_push(ARR, VALUE) \
+    re_dyn_arr_insert_fast((ARR), (VALUE), re_dyn_arr_count(ARR))
 
-// Pushes an entire array onto the back of the dynamic array.
-#define re_da_push_arr(DA, ARR, COUNT) _re_da_insert_arr((void **) &(DA), (ARR), (COUNT), re_da_count(DA))
-// Removes COUNT elements from the back of the dyanmic array.
-// If OUT is not NULL the removed values will be copied to it.
-#define re_da_pop_arr(DA, COUNT, OUT) _re_da_remove_arr((void **) &(DA), (COUNT), re_da_count(DA) - (COUNT), (OUT));
+#define re_dyn_arr_insert(ARR, VALUE, INDEX) ({ \
+        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        __typeof__(VALUE) temp_value = (VALUE); \
+        _re_dyn_arr_insert_arr_impl((void **) &(ARR), &temp_value, 1, (INDEX)); \
+    })
 
-// Retrieves the number of elements stored in the dynamic array.
-#define re_da_count(DA) _re_da_count(DA)
-// Retrieves the last value in the dynamic array.
-#define re_da_last(DA) ((DA)[re_da_count(DA) - 1])
-// Makes an iterator to iterate over dyanmic array.
-#define re_da_iter(DA, I) for (usize_t I = 0; I < re_da_count(DA); I++)
+#define re_dyn_arr_insert_fast(ARR, VALUE, INDEX) ({ \
+        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        __typeof__(VALUE) temp_value = (VALUE); \
+        _re_dyn_arr_insert_fast_impl((void **) &(ARR), &temp_value, (INDEX)); \
+    })
+
+#define re_dyn_arr_push_arr(ARR, VALUE_ARR, COUNT) ({ \
+        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        _re_dyn_arr_insert_arr_impl((void **) &(ARR), (VALUE_ARR), (COUNT), re_dyn_arr_count(ARR)); \
+    })
+
+
+#define re_dyn_arr_insert_arr(ARR, VALUE_ARR, COUNT, INDEX) ({ \
+        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        _re_dyn_arr_insert_arr_impl((void **) &(ARR), (VALUE_ARR), (COUNT), (INDEX)); \
+    })
+
+#define re_dyn_arr_reserve(ARR, COUNT) \
+    re_dyn_arr_push_arr((ARR), NULL, (COUNT))
+
+// Removal
+#define re_dyn_arr_pop(ARR) \
+    re_dyn_arr_remove_fast((ARR), re_dyn_arr_count(ARR) - 1)
+
+#define re_dyn_arr_remove(ARR, INDEX) ({ \
+        __typeof__(*(ARR)) result; \
+        _re_dyn_arr_remove_arr_impl((void **) &(ARR), (INDEX), 1, &result); \
+        result; \
+    })
+
+#define re_dyn_arr_remove_fast(ARR, INDEX) ({ \
+        __typeof__(*(ARR)) result; \
+        _re_dyn_arr_remove_fast_impl((void **) &(ARR), (INDEX), &result); \
+        result; \
+    })
+
+#define re_dyn_arr_pop_arr(ARR, COUNT, OUT) \
+    _re_dyn_arr_remove_arr_impl((void **) &(ARR), (COUNT), re_dyn_arr_count(ARR) - (COUNT), (OUT))
+
+#define re_dyn_arr_remove_arr(ARR, COUNT, INDEX, OUT) \
+    _re_dyn_arr_remove_arr_impl((void **) &(ARR), (COUNT), (INDEX), (OUT))
+
 
 // Private API
-RE_API void _re_da_resize(void **da, usize_t count);
-RE_API void _re_da_create(void **da, usize_t size);
-RE_API void _re_da_destroy(void **da);
-RE_API void _re_da_insert_fast(void **da, const void *value, usize_t index);
-RE_API void _re_da_remove_fast(void **da, usize_t index, void *output);
-RE_API void _re_da_insert_arr(void **da, const void *arr, usize_t count, usize_t index);
-RE_API void _re_da_remove_arr(void **da, usize_t count, usize_t index, void *output);
-RE_API usize_t _re_da_count(void *da);
+RE_API void _re_dyn_arr_new_impl(void **arr, u32_t size);
+RE_API void _re_dyn_arr_free_impl(void **arr);
+RE_API void _re_dyn_arr_insert_fast_impl(void **arr, const void *value, u32_t index);
+RE_API void _re_dyn_arr_insert_arr_impl(void **arr, const void *value_arr, u32_t count, u32_t index);
+RE_API void _re_dyn_arr_remove_fast_impl(void **arr, u32_t index, void *result);
+RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, void *out);
+
+/*=========================*/
+// Hash map
+/*=========================*/
+
+#define re_hash_map_t(KEY, VALUE) struct { \
+    struct { \
+        KEY key; \
+        VALUE value; \
+        u64_t hash; \
+        bucket_state_t state; \
+    } *buckets; \
+    u32_t count; \
+    u32_t tombstone_count; \
+    void *null_value; \
+    void *null_key; \
+    re_hash_func_t hash_func; \
+    re_equal_func_t equal_func; \
+} *
+
+#define re_hash_map_init(MAP, NULL_KEY, NULL_VALUE, HASH_FUNC, EQUAL_FUNC) ({ \
+        if ((MAP) == NULL) { \
+            (MAP) = re_malloc(sizeof(*(MAP))); \
+            *(MAP) = (__typeof__(*(MAP))) {0}; \
+            re_dyn_arr_reserve((MAP)->buckets, 8); \
+            (MAP)->count = 0; \
+            \
+            __typeof__(NULL_KEY) temp_null_key = (NULL_KEY); \
+            (MAP)->null_key = re_malloc(sizeof((MAP)->buckets->key)); \
+            memcpy((MAP)->null_key, &temp_null_key, sizeof((MAP)->buckets->key)); \
+            \
+            __typeof__(NULL_VALUE) temp_null_value = (NULL_VALUE); \
+            (MAP)->null_value = re_malloc(sizeof((MAP)->buckets->value)); \
+            memcpy((MAP)->null_value, &temp_null_value, sizeof((MAP)->buckets->value)); \
+            \
+            (MAP)->hash_func = (void *) (HASH_FUNC); \
+            (MAP)->equal_func = (EQUAL_FUNC); \
+        } \
+    })
+
+#define re_hash_map_init_default(MAP) \
+    re_hash_map_init((MAP), NULL, NULL, (re_hash_func_t) (void *) re_fvn1a_hash, _re_hash_map_default_equal_func)
+
+#define re_hash_map_free(MAP) ({ \
+        re_dyn_arr_free((MAP)->buckets); \
+        re_free((MAP)->null_key); \
+        re_free((MAP)->null_value); \
+        re_free(MAP); \
+        (MAP) = NULL; \
+    })
+
+#define re_hash_map_count(MAP) ((MAP)->count)
+
+#define re_hash_map_set(MAP, KEY, VALUE) ({ \
+        re_hash_map_init_default(MAP); \
+        /* Resize if needed. */ \
+        if ((MAP)->count >= re_dyn_arr_count((MAP)->buckets) * _RE_HASH_MAP_MAX_LOAD) { \
+            __typeof__((MAP)->buckets) new_buckets = NULL; \
+            re_dyn_arr_reserve(new_buckets, re_dyn_arr_count((MAP)->buckets) * _RE_HASH_MAP_GROW_FACTOR); \
+            for (u32_t i = 0; i < re_dyn_arr_count((MAP)->buckets); i++) { \
+                if ((MAP)->buckets[i].state == BUCKET_STATE_IN_USE) { \
+                    b8_t _temp; (void) _temp; \
+                    u32_t index = _re_hash_map_find_bucket(new_buckets, &(MAP)->buckets[i].key, (MAP)->buckets[i].hash, (MAP)->equal_func, _temp); \
+                    new_buckets[index] = (MAP)->buckets[i]; \
+                } \
+            } \
+            re_dyn_arr_free((MAP)->buckets); \
+            (MAP)->buckets = new_buckets; \
+        } \
+        \
+        __typeof__((MAP)->buckets->key) temp_key = (KEY); \
+        u64_t hash = (MAP)->hash_func(&temp_key, sizeof((MAP)->buckets->key)); \
+        b8_t new_entry; \
+        u32_t index = _re_hash_map_find_bucket((MAP)->buckets, &temp_key, hash, (MAP)->equal_func, new_entry); \
+        (MAP)->buckets[index].key = temp_key; \
+        (MAP)->buckets[index].value = (VALUE); \
+        (MAP)->buckets[index].hash = hash; \
+        (MAP)->buckets[index].state = BUCKET_STATE_IN_USE; \
+        if (new_entry) { \
+            (MAP)->count++; \
+        } \
+    })
+
+#define re_hash_map_get(MAP, KEY) ({ \
+        __typeof__((MAP)->buckets->value) result; \
+        __typeof__((MAP)->buckets->key) temp_key = (KEY); \
+        u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
+        b8_t temp; (void) temp; \
+        i32_t index = _re_hash_map_find_bucket((MAP)->buckets, &temp_key, hash, (MAP)->equal_func, temp); \
+        if ((MAP)->buckets[index].state == BUCKET_STATE_IN_USE) { \
+            result = (MAP)->buckets[index].value; \
+        } else { \
+            memcpy(&result, (MAP)->null_value, sizeof((MAP)->buckets->value)); \
+        } \
+        result; \
+    })
+
+
+#define re_hash_map_get_index_key(MAP, INDEX) ({ \
+        __typeof__((MAP)->buckets->key) result; \
+        if ((MAP)->buckets[(INDEX)].state == BUCKET_STATE_IN_USE) { \
+            result = (MAP)->buckets[(INDEX)].key; \
+        } else { \
+            memcpy(&result, (MAP)->null_key, sizeof((MAP)->buckets->key)); \
+        } \
+        result; \
+    })
+
+#define re_hash_map_get_index_value(MAP, INDEX) ({ \
+        __typeof__((MAP)->buckets->value) result; \
+        if ((MAP)->buckets[(INDEX)].state == BUCKET_STATE_IN_USE) { \
+            result = (MAP)->buckets[(INDEX)].value; \
+        } else { \
+            memcpy(&result, (MAP)->null_value, sizeof((MAP)->buckets->value)); \
+        } \
+        result; \
+    })
+
+#define re_hash_map_has(MAP, KEY) ({ \
+        __typeof__((MAP)->buckets->key) temp_key = (KEY); \
+        u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
+        b8_t temp; (void) temp; \
+        i32_t index = _re_hash_map_find_bucket((MAP)->buckets, &temp_key, hash, (MAP)->equal_func, temp); \
+        (MAP)->buckets[index].state == BUCKET_STATE_IN_USE; \
+    })
+
+#define re_hash_map_remove(MAP, KEY) ({ \
+        __typeof__((MAP)->buckets->value) result; \
+        __typeof__((MAP)->buckets->key) temp_key = (KEY); \
+        u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
+        b8_t temp; (void) temp; \
+        i32_t index = _re_hash_map_find_bucket((MAP)->buckets, &temp_key, hash, (MAP)->equal_func, temp); \
+        if ((MAP)->buckets[index].state == BUCKET_STATE_IN_USE) { \
+            result = (MAP)->buckets[index].value; \
+            (MAP)->buckets[index].state = BUCKET_STATE_TOMBSTONE; \
+            (MAP)->count--; \
+            (MAP)->tombstone_count++; \
+        } else { \
+            memcpy(&result, (MAP)->null_value, sizeof((MAP)->buckets->value)); \
+        } \
+        /* Redo bucket array to get rid of tombstones. */ \
+        if ((MAP)->tombstone_count >= re_dyn_arr_count((MAP)->buckets) * _RE_HASH_MAP_MAX_TOMBSTONE_LOAD) { \
+            __typeof__((MAP)->buckets) new_buckets = NULL; \
+            re_dyn_arr_reserve(new_buckets, re_dyn_arr_count((MAP)->buckets)); \
+            for (u32_t i = 0; i < re_dyn_arr_count((MAP)->buckets); i++) { \
+                if ((MAP)->buckets[i].state == BUCKET_STATE_IN_USE) { \
+                    b8_t _temp; (void) _temp; \
+                    u32_t index = _re_hash_map_find_bucket(new_buckets, &(MAP)->buckets[i].key, (MAP)->buckets[i].hash, (MAP)->equal_func, _temp); \
+                    new_buckets[index] = (MAP)->buckets[i]; \
+                } \
+            } \
+            re_dyn_arr_free((MAP)->buckets); \
+            (MAP)->buckets = new_buckets; \
+            (MAP)->tombstone_count = 0; \
+        } \
+        result; \
+    })
+
+#define _re_hash_map_find_bucket(BUCKETS, KEY, HASH, EQUAL_FUNC, NEW_ENTRY) ({ \
+        u32_t index = (HASH) % re_dyn_arr_count((BUCKETS)); \
+        (NEW_ENTRY) = true; \
+        while (true) { \
+            if ((BUCKETS)[index].state == BUCKET_STATE_INACTIVE) { \
+                break; \
+            } else if ((BUCKETS)[index].hash == (HASH) && \
+                       (EQUAL_FUNC)((KEY), &(BUCKETS)[index].key, sizeof((BUCKETS)->key))) { \
+                (NEW_ENTRY) = false; \
+                break; \
+           } \
+           index = (index + 1) % re_dyn_arr_count((BUCKETS)); \
+        } \
+        index; \
+    })
+
+// Iteration
+typedef u32_t re_hash_map_iter_t;
+
+#define re_hash_map_iter_get(MAP) \
+    re_hash_map_iter_next(MAP, -1) \
+
+#define re_hash_map_iter_valid(ITER) (ITER != U32_MAX)
+
+#define re_hash_map_iter_next(MAP, ITER) ({ \
+        u32_t result = U32_MAX; \
+        for (u32_t i = (ITER) + 1; i < re_dyn_arr_count((MAP)->buckets); i++) { \
+            if ((MAP)->buckets[i].state == BUCKET_STATE_IN_USE) { \
+                result = i; \
+                break; \
+            } \
+        } \
+        result; \
+    })
+
+
+#define _RE_HASH_MAP_MAX_LOAD 0.75f
+#define _RE_HASH_MAP_GROW_FACTOR 2
+#define _RE_HASH_MAP_MAX_TOMBSTONE_LOAD 0.25f
+
+typedef enum {
+    BUCKET_STATE_INACTIVE,
+    BUCKET_STATE_IN_USE,
+    BUCKET_STATE_TOMBSTONE
+} bucket_state_t;
+
+RE_API b8_t _re_hash_map_default_equal_func(const void *a, const void *b, u32_t size);
 
 /*=========================*/
 // Logger
@@ -915,5 +1054,16 @@ RE_API void *re_os_mem_reserve(usize_t size);
 RE_API void re_os_mem_commit(void *ptr, usize_t size);
 RE_API void re_os_mem_decommit(void *ptr, usize_t size);
 RE_API void re_os_mem_release(void *ptr, usize_t size);
+
+#ifdef RE_UNIT_TESTS
+
+/*=========================*/
+// Unit test
+/*=========================*/
+
+RE_API void re_dyn_arr_unit_test(void);
+RE_API void re_hash_map_unit_test(void);
+
+#endif // RE_UNIT_TESTS
 
 #endif // REBOUND_H
