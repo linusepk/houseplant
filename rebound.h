@@ -463,20 +463,20 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
             (MAP)->count = 0; \
             \
             __typeof__(NULL_KEY) temp_null_key = (NULL_KEY); \
-            (MAP)->null_key = re_malloc(sizeof((MAP)->buckets->key)); \
-            memcpy((MAP)->null_key, &temp_null_key, sizeof((MAP)->buckets->key)); \
+            (MAP)->null_key = re_malloc(sizeof(__typeof__((MAP)->buckets->key))); \
+            memcpy((MAP)->null_key, &temp_null_key, sizeof(__typeof__((MAP)->buckets->key))); \
             \
             __typeof__(NULL_VALUE) temp_null_value = (NULL_VALUE); \
-            (MAP)->null_value = re_malloc(sizeof((MAP)->buckets->value)); \
-            memcpy((MAP)->null_value, &temp_null_value, sizeof((MAP)->buckets->value)); \
+            (MAP)->null_value = re_malloc(sizeof(__typeof__((MAP)->buckets->value))); \
+            memcpy((MAP)->null_value, &temp_null_value, sizeof(__typeof__((MAP)->buckets->value))); \
             \
-            (MAP)->hash_func = (void *) (HASH_FUNC); \
+            (MAP)->hash_func = (HASH_FUNC); \
             (MAP)->equal_func = (EQUAL_FUNC); \
         } \
     })
 
 #define re_hash_map_init_default(MAP) \
-    re_hash_map_init((MAP), NULL, NULL, (re_hash_func_t) (void *) re_fvn1a_hash, _re_hash_map_default_equal_func)
+    re_hash_map_init((MAP), ((__typeof__((MAP)->buckets->key)) {0}), ((__typeof__((MAP)->buckets->value)) {0}), (re_hash_func_t) (void *) re_fvn1a_hash, _re_hash_map_default_equal_func)
 
 #define re_hash_map_free(MAP) ({ \
         re_dyn_arr_free((MAP)->buckets); \
@@ -519,6 +519,7 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
     })
 
 #define re_hash_map_get(MAP, KEY) ({ \
+        re_hash_map_init_default(MAP); \
         __typeof__((MAP)->buckets->value) result; \
         __typeof__((MAP)->buckets->key) temp_key = (KEY); \
         u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
@@ -527,33 +528,36 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
         if ((MAP)->buckets[index].state == BUCKET_STATE_IN_USE) { \
             result = (MAP)->buckets[index].value; \
         } else { \
-            memcpy(&result, (MAP)->null_value, sizeof((MAP)->buckets->value)); \
+            memcpy(&result, (MAP)->null_value, sizeof(__typeof__((MAP)->buckets->value))); \
         } \
         result; \
     })
 
 
 #define re_hash_map_get_index_key(MAP, INDEX) ({ \
+        re_hash_map_init_default(MAP); \
         __typeof__((MAP)->buckets->key) result; \
         if ((MAP)->buckets[(INDEX)].state == BUCKET_STATE_IN_USE) { \
             result = (MAP)->buckets[(INDEX)].key; \
         } else { \
-            memcpy(&result, (MAP)->null_key, sizeof((MAP)->buckets->key)); \
+            memcpy(&result, (MAP)->null_key, sizeof(__typeof__((MAP)->buckets->key))); \
         } \
         result; \
     })
 
 #define re_hash_map_get_index_value(MAP, INDEX) ({ \
+        re_hash_map_init_default(MAP); \
         __typeof__((MAP)->buckets->value) result; \
         if ((MAP)->buckets[(INDEX)].state == BUCKET_STATE_IN_USE) { \
             result = (MAP)->buckets[(INDEX)].value; \
         } else { \
-            memcpy(&result, (MAP)->null_value, sizeof((MAP)->buckets->value)); \
+            memcpy(&result, (MAP)->null_value, sizeof(__typeof__((MAP)->buckets->value))); \
         } \
         result; \
     })
 
 #define re_hash_map_has(MAP, KEY) ({ \
+        re_hash_map_init_default(MAP); \
         __typeof__((MAP)->buckets->key) temp_key = (KEY); \
         u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
         b8_t temp; (void) temp; \
@@ -562,6 +566,7 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
     })
 
 #define re_hash_map_remove(MAP, KEY) ({ \
+        re_hash_map_init_default(MAP); \
         __typeof__((MAP)->buckets->value) result; \
         __typeof__((MAP)->buckets->key) temp_key = (KEY); \
         u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
@@ -618,6 +623,7 @@ typedef u32_t re_hash_map_iter_t;
 #define re_hash_map_iter_valid(ITER) (ITER != U32_MAX)
 
 #define re_hash_map_iter_next(MAP, ITER) ({ \
+        re_hash_map_init_default(MAP); \
         u32_t result = U32_MAX; \
         for (u32_t i = (ITER) + 1; i < re_dyn_arr_count((MAP)->buckets); i++) { \
             if ((MAP)->buckets[i].state == BUCKET_STATE_IN_USE) { \
