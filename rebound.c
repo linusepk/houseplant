@@ -397,7 +397,9 @@ void _re_dyn_arr_remove_fast_impl(void **arr, u32_t index, void *result) {
     ptr_t end_pos = (ptr_t) *arr + (head->count - 1) * head->size;
     ptr_t gap_pos = (ptr_t) *arr + index * head->size;
 
-    memcpy(result, gap_pos, head->size);
+    if (result != NULL) {
+        memcpy(result, gap_pos, head->size);
+    }
     memcpy(gap_pos, end_pos, head->size);
 
     head->count--;
