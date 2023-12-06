@@ -343,6 +343,10 @@ u32_t re_dyn_arr_count(void *arr) {
     return head_from_re_dyn_arr(arr)->count;
 }
 
+u32_t re_dyn_arr_size(void *arr) {
+    return head_from_re_dyn_arr(arr)->size;
+}
+
 void _re_dyn_arr_insert_fast_impl(void **arr, const void *value, u32_t index) {
     re_dyn_arr_head_t *head = head_from_re_dyn_arr(*arr);
     RE_ASSERT(index <= head->count, "Dyanmic array insertion out of bounds.");

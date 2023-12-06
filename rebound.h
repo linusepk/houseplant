@@ -372,6 +372,7 @@ RE_API re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena);
     _re_dyn_arr_free_impl((void **) &(ARR))
 
 u32_t re_dyn_arr_count(void *arr);
+u32_t re_dyn_arr_size(void *arr);
 
 #define re_dyn_arr_last(ARR) ((ARR)[re_dyn_arr_count(ARR) - 1])
 
@@ -380,25 +381,25 @@ u32_t re_dyn_arr_count(void *arr);
     re_dyn_arr_insert_fast((ARR), (VALUE), re_dyn_arr_count(ARR))
 
 #define re_dyn_arr_insert(ARR, VALUE, INDEX) ({ \
-        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        re_dyn_arr_new((ARR), sizeof(__typeof__(*(ARR)))); \
         __typeof__(VALUE) temp_value = (VALUE); \
         _re_dyn_arr_insert_arr_impl((void **) &(ARR), &temp_value, 1, (INDEX)); \
     })
 
 #define re_dyn_arr_insert_fast(ARR, VALUE, INDEX) ({ \
-        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        re_dyn_arr_new((ARR), sizeof(__typeof__(*(ARR)))); \
         __typeof__(VALUE) temp_value = (VALUE); \
         _re_dyn_arr_insert_fast_impl((void **) &(ARR), &temp_value, (INDEX)); \
     })
 
 #define re_dyn_arr_push_arr(ARR, VALUE_ARR, COUNT) ({ \
-        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        re_dyn_arr_new((ARR), sizeof(__typeof__(*(ARR)))); \
         _re_dyn_arr_insert_arr_impl((void **) &(ARR), (VALUE_ARR), (COUNT), re_dyn_arr_count(ARR)); \
     })
 
 
 #define re_dyn_arr_insert_arr(ARR, VALUE_ARR, COUNT, INDEX) ({ \
-        re_dyn_arr_new((ARR), sizeof(*(ARR))); \
+        re_dyn_arr_new((ARR), sizeof(__typeof__(*(ARR)))); \
         _re_dyn_arr_insert_arr_impl((void **) &(ARR), (VALUE_ARR), (COUNT), (INDEX)); \
     })
 
@@ -411,7 +412,7 @@ u32_t re_dyn_arr_count(void *arr);
 
 #define re_dyn_arr_remove(ARR, INDEX) ({ \
         __typeof__(*(ARR)) result; \
-        _re_dyn_arr_remove_arr_impl((void **) &(ARR), (INDEX), 1, &result); \
+        _re_dyn_arr_remove_arr_impl((void **) &(ARR), 1, (INDEX), &result); \
         result; \
     })
 
