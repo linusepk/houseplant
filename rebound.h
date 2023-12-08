@@ -556,6 +556,14 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
         } \
         result; \
     })
+#define re_hash_map_get_index_value_ptr(MAP, INDEX) ({ \
+        re_hash_map_init_default(MAP); \
+        __typeof__((MAP)->buckets->value) *result = NULL; \
+        if ((MAP)->buckets[(INDEX)].state == BUCKET_STATE_IN_USE) { \
+            result = &(MAP)->buckets[(INDEX)].value; \
+        } \
+        result; \
+    })
 
 #define re_hash_map_has(MAP, KEY) ({ \
         re_hash_map_init_default(MAP); \
