@@ -480,11 +480,13 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
     re_hash_map_init((MAP), ((__typeof__((MAP)->buckets->key)) {0}), ((__typeof__((MAP)->buckets->value)) {0}), (re_hash_func_t) (void *) re_fvn1a_hash, _re_hash_map_default_equal_func)
 
 #define re_hash_map_free(MAP) ({ \
-        re_dyn_arr_free((MAP)->buckets); \
-        re_free((MAP)->null_key); \
-        re_free((MAP)->null_value); \
-        re_free(MAP); \
-        (MAP) = NULL; \
+        if ((MAP) != NULL) { \
+            re_dyn_arr_free((MAP)->buckets); \
+            re_free((MAP)->null_key); \
+            re_free((MAP)->null_value); \
+            re_free(MAP); \
+            (MAP) = NULL; \
+        } \
     })
 
 #define re_hash_map_count(MAP) ((MAP)->count)
