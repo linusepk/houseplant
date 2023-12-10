@@ -568,12 +568,15 @@ RE_API void _re_dyn_arr_remove_arr_impl(void **arr, u32_t count, u32_t index, vo
     })
 
 #define re_hash_map_has(MAP, KEY) ({ \
-        re_hash_map_init_default(MAP); \
-        __typeof__((MAP)->buckets->key) temp_key = (KEY); \
-        u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
-        b8_t temp; (void) temp; \
-        i32_t index = _re_hash_map_find_bucket((MAP)->buckets, &temp_key, hash, (MAP)->equal_func, temp); \
-        (MAP)->buckets[index].state == BUCKET_STATE_IN_USE; \
+        b8_t result = false; \
+        if ((MAP) != NULL) { \
+            __typeof__((MAP)->buckets->key) temp_key = (KEY); \
+            u64_t hash = (MAP)->hash_func(&temp_key, sizeof(temp_key)); \
+            b8_t temp; (void) temp; \
+            i32_t index = _re_hash_map_find_bucket((MAP)->buckets, &temp_key, hash, (MAP)->equal_func, temp); \
+            result = (MAP)->buckets[index].state == BUCKET_STATE_IN_USE; \
+        } \
+        result; \
     })
 
 #define re_hash_map_remove(MAP, KEY) ({ \
