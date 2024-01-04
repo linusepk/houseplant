@@ -610,7 +610,11 @@ re_vec2_t re_vec2_rotate(re_vec2_t vec, f32_t degrees) {
 }
 
 re_vec2_t re_vec2_normalize(re_vec2_t vec) {
-    return re_vec2_muls(vec, 1.0f / re_vec2_magnitude(vec));
+    f32_t mag = re_vec2_magnitude(vec);
+    if (mag == 0.0f) {
+        return re_vec2s(0.0f);
+    }
+    return re_vec2_muls(vec, 1.0f / mag);
 }
 f32_t re_vec2_magnitude(re_vec2_t vec) {
     return sqrtf(vec.x * vec.x + vec.y * vec.y);
