@@ -276,6 +276,7 @@ struct re_str_t {
     usize_t len;
 };
 
+#define re_str_fmt(string) (i32_t) string.len, string.str
 #define re_str_null ((re_str_t) {NULL, 0})
 #define re_str_lit(str) re_str((u8_t *) (str), sizeof(str) - 1)
 #define re_str_cstr(str) re_str((u8_t *) (str), strlen(str))
@@ -288,6 +289,16 @@ RE_API re_str_t re_str_skip(re_str_t string, usize_t len);
 RE_API i32_t    re_str_cmp(re_str_t a, re_str_t b);
 RE_API re_str_t re_str_pushf(const char *fmt, va_list args, re_arena_t *arena);
 RE_API re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena);
+RE_API re_str_t re_str_concat(re_str_t a, re_str_t b, re_arena_t *arena);
+
+typedef struct re_str_list_t re_str_list_t;
+struct re_str_list_t {
+    re_str_list_t *next;
+    re_str_t str;
+};
+
+RE_API re_str_list_t *re_str_list_append(re_str_list_t *list, re_str_t str, re_arena_t *arena);
+RE_API re_str_t re_str_list_concat(re_str_list_t *list, re_arena_t *arena);
 
 /*=========================*/
 // Linked lists

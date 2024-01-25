@@ -50,4 +50,18 @@ void test_str(void) {
         RE_ENSURE(re_str_cmp(expected, skip) == 0, "re_str_skip failed.");
         re_log_info("re_str_skip passed.");
     }
+
+    {
+        re_str_t expected = re_str_lit("rebound");
+
+        re_arena_temp_t scratch = re_arena_scratch_get(NULL, 0);
+        re_str_list_t *list = re_str_list_append(NULL, re_str_lit("reb"), scratch.arena);
+        re_str_list_append(list, re_str_lit("ound"), scratch.arena);
+        re_str_t concat = re_str_list_concat(list, scratch.arena);
+
+        RE_ENSURE(re_str_cmp(expected, concat) == 0, "re_str_list_concat failed.");
+
+        re_arena_scratch_release(&scratch);
+        re_log_info("re_str_skip passed.");
+    }
 }

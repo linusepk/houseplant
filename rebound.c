@@ -284,6 +284,51 @@ re_str_t re_str_push_copy(re_str_t str, re_arena_t *arena) {
     return re_str(cstr, str.len);
 }
 
+re_str_t re_str_concat(re_str_t a, re_str_t b, re_arena_t *arena) {
+    re_arena_temp_t scratch = re_arena_scratch_get(&arena, 1);
+
+    re_str_list_t *list = re_str_list_append(NULL, a, scratch.arena);
+    re_str_list_append(list, b, scratch.arena);
+    re_str_t concat = re_str_list_concat(list, arena);
+
+    re_arena_scratch_release(&scratch);
+
+    return concat;
+}
+
+re_str_list_t *re_str_list_append(re_str_list_t *list, re_str_t str, re_arena_t *arena) {
+    re_str_list_t *next = re_arena_push_zero(arena, sizeof(re_str_list_t));
+    next->str = str;
+
+    if (list != NULL) {
+        re_str_list_t *last = list;
+        for (; last->next != NULL; last = last->next);
+        last->next = next;
+    } else {
+        return next;
+    }
+
+    return list;
+}
+
+re_str_t re_str_list_concat(re_str_list_t *list, re_arena_t *arena) {
+    usize_t len = 0;
+    for (re_str_list_t *curr = list; curr != NULL; curr = curr->next) {
+        len += curr->str.len;
+    }
+
+    u8_t *buffer = re_arena_push(arena, len);
+
+    usize_t i = 0;
+    for (re_str_list_t *curr = list; curr != NULL; curr = curr->next) {
+        for (u32_t j = 0; j < curr->str.len; j++) {
+            buffer[i++] = curr->str.str[j];
+        }
+    }
+
+    return re_str(buffer, len);
+}
+
 /*=========================*/
 // Dynamic array
 /*=========================*/
